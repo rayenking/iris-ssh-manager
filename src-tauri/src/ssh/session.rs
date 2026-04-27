@@ -195,28 +195,33 @@ impl SshSession {
 
         self.read_task = Some(tokio::spawn(async move {
             let mut buffer = Vec::with_capacity(READ_BATCH_LIMIT);
+            let flush_interval = Duration::from_millis(8);
 
-            while let Some(chunk) = receiver.recv().await {
-                if buffer.len() + chunk.len() > READ_BATCH_LIMIT && !buffer.is_empty() {
+            loop {
+                if buffer.is_empty() {
+                    match receiver.recv().await {
+                        Some(chunk) => buffer.extend_from_slice(&chunk),
+                        None => break,
+                    }
+                } else {
+                    match tokio::time::timeout(flush_interval, receiver.recv()).await {
+                        Ok(Some(chunk)) => {
+                            buffer.extend_from_slice(&chunk);
+                        }
+                        Ok(None) => break,
+                        Err(_) => {
+                            if channel.send(std::mem::take(&mut buffer)).is_err() {
+                                break;
+                            }
+                            continue;
+                        }
+                    }
+                }
+
+                if buffer.len() >= READ_BATCH_LIMIT {
                     if channel.send(std::mem::take(&mut buffer)).is_err() {
                         break;
                     }
-                }
-
-                if chunk.len() >= READ_BATCH_LIMIT {
-                    if !buffer.is_empty() && channel.send(std::mem::take(&mut buffer)).is_err() {
-                        break;
-                    }
-                    if channel.send(chunk).is_err() {
-                        break;
-                    }
-                    continue;
-                }
-
-                buffer.extend_from_slice(&chunk);
-
-                if buffer.len() >= 1024 && channel.send(std::mem::take(&mut buffer)).is_err() {
-                    break;
                 }
             }
 
