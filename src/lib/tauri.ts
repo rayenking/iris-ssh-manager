@@ -12,6 +12,77 @@ import type { Snippet, CreateSnippetInput, UpdateSnippetInput } from '../types/s
 import type { Tunnel, TunnelConfig } from '../types/tunnel';
 import type { FileEntry, TransferProgress } from '../types/sftp';
 
+const SETTINGS_STORAGE_PREFIX = 'iris-ssh-manager.settings.';
+const memorySettingsFallback = new Map<string, string>();
+
+function isTauriRuntime() {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
+
+function getBrowserStorage() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function readFallbackSetting(key: string) {
+  const storage = getBrowserStorage();
+
+  if (storage) {
+    const value = storage.getItem(`${SETTINGS_STORAGE_PREFIX}${key}`);
+    if (value !== null) {
+      return value;
+    }
+  }
+
+  return memorySettingsFallback.get(key) ?? null;
+}
+
+function writeFallbackSetting(key: string, value: string) {
+  const storage = getBrowserStorage();
+
+  if (storage) {
+    storage.setItem(`${SETTINGS_STORAGE_PREFIX}${key}`, value);
+    return;
+  }
+
+  memorySettingsFallback.set(key, value);
+}
+
+function readAllFallbackSettings() {
+  const storage = getBrowserStorage();
+  const settings: Record<string, string> = {};
+
+  if (storage) {
+    for (let index = 0; index < storage.length; index += 1) {
+      const storageKey = storage.key(index);
+
+      if (!storageKey || !storageKey.startsWith(SETTINGS_STORAGE_PREFIX)) {
+        continue;
+      }
+
+      const key = storageKey.slice(SETTINGS_STORAGE_PREFIX.length);
+      const value = storage.getItem(storageKey);
+
+      if (value !== null) {
+        settings[key] = value;
+      }
+    }
+  }
+
+  memorySettingsFallback.forEach((value, key) => {
+    settings[key] = value;
+  });
+
+  return settings;
+}
+
 export const tauriApi = {
   listConnections: (): Promise<Connection[]> => 
     invoke('list_connections'),
@@ -129,11 +200,15 @@ export const tauriApi = {
 
   // Settings
   getSetting: (key: string): Promise<string | null> =>
-    invoke('get_setting', { key }),
+    isTauriRuntime() ? invoke('get_setting', { key }) : Promise.resolve(readFallbackSetting(key)),
 
   setSetting: (key: string, value: string): Promise<void> =>
-    invoke('set_setting', { key, value }),
+    isTauriRuntime()
+      ? invoke('set_setting', { key, value })
+      : Promise.resolve().then(() => {
+          writeFallbackSetting(key, value);
+        }),
 
   getAllSettings: (): Promise<Record<string, string>> =>
-    invoke('get_all_settings'),
+    isTauriRuntime() ? invoke('get_all_settings') : Promise.resolve(readAllFallbackSettings()),
 };
