@@ -1,0 +1,14 @@
+Task 10 SFTP evidence summary
+
+Fresh verification basis:
+- cargo check: PASS
+- npx tsc --noEmit: PASS
+- npm run build: PASS
+
+Completed-session facts summarized truthfully:
+- SFTP reused an existing SSH handle by opening a new session channel and requesting the `sftp` subsystem.
+- The Task 10 frontend build break from mangled path-normalization regex syntax was fixed in the completed session.
+- The current clean TypeScript check and production build confirm that fix remains intact.
+
+Environment limit:
+- No live SSH/SFTP Docker scenario was re-run in this evidence retry.

@@ -1,0 +1,12 @@
+Task 8 keychain evidence summary
+
+Fresh verification basis:
+- cargo check: PASS
+- npm run tauri build: advanced through release build and Debian bundling successfully before failing at AppImage bundling.
+
+Completed-session facts summarized truthfully:
+- Forbidden `keyring` usage had already been replaced with `keyring-core` and platform-native store crates.
+- The current successful Rust compile confirms the keychain integration no longer blocks the backend build.
+
+Limitations:
+- Native OS keychain read/write behavior was not re-verified interactively during this evidence retry.

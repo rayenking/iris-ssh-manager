@@ -1,0 +1,14 @@
+Task 13 settings + themes evidence summary
+
+Fresh verification run:
+- npx tsc --noEmit: PASS
+- npm run build: PASS
+
+Completed-session facts summarized truthfully:
+- Settings now persist through `src/stores/settingsStore.ts`.
+- `src/components/settings/SettingsPage.tsx` is the real settings surface with Appearance, Terminal, Connections, and Keybindings sections.
+- Theme persistence and browser-safe fallbacks were added so plain Vite mode no longer throws when saving settings.
+- Terminal settings update live in `src/components/terminal/TerminalView.tsx`.
+
+Environment limit:
+- Theme switching and settings persistence were not re-verified interactively inside a live browser/Tauri session during this retry task.

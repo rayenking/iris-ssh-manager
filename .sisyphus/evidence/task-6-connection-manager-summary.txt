@@ -1,0 +1,13 @@
+Task 6 connection manager evidence summary
+
+Fresh verification basis:
+- npx tsc --noEmit: PASS
+- npm run build: PASS
+
+Completed-session context summarized truthfully:
+- Connection manager UI and form flows remained part of the passing frontend build.
+- Later browser-safe fallback work specifically addressed plain Vite mode so connection UI no longer crashes when Tauri runtime APIs are unavailable.
+
+Scope note:
+- This retry task did not re-run interactive CRUD browser scenarios.
+- Evidence is limited to current compile/build proof plus prior verified session state.

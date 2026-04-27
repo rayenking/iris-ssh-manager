@@ -1,0 +1,18 @@
+Task 14 packaging evidence
+
+Fresh verification run:
+- Command: npm run tauri build
+- Working directory: /home/ryns/RynsWorkspace/IrisSSHmanager/iris-ssh-manager
+
+Observed result:
+- Frontend build completed successfully.
+- Rust release build completed successfully.
+- Debian bundle was produced successfully:
+  /home/ryns/RynsWorkspace/IrisSSHmanager/iris-ssh-manager/src-tauri/target/release/bundle/deb/Iris SSH Manager_0.1.0_amd64.deb
+- AppImage bundling then failed with:
+  failed to bundle project `failed to run linuxdeploy`
+
+Truthful interpretation:
+- Packaging is partially verified on the current Arch-based environment.
+- The canonical AppImage target remains configured, but local AppImage generation is still blocked by the known linuxdeploy/AppImage toolchain limitation noted in project learnings.
+- No claim is made here that local AppImage packaging passes.

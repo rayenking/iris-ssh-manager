@@ -1,0 +1,13 @@
+Task 11 tunnel evidence summary
+
+Fresh verification basis:
+- cargo check: PASS
+- npx tsc --noEmit: PASS
+- npm run build: PASS
+
+Completed-session facts summarized truthfully:
+- Tunnel ownership stays inside each SSH session so disconnect/drop stops local, remote, and dynamic forwards automatically.
+- Local forwarding used direct TCP/IP channels, reverse forwarding used `tcpip_forward`, and dynamic forwarding was implemented as a SOCKS5 CONNECT bridge.
+
+Environment limit:
+- No live port-forwarding exercise was re-run against the Docker SSH test server in this retry task.

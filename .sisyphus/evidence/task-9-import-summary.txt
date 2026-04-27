@@ -1,0 +1,13 @@
+Task 9 SSH config import evidence summary
+
+Fresh verification basis:
+- cargo check: PASS
+- npx tsc --noEmit: PASS
+- npm run build: PASS
+
+Completed-session context summarized from project notes:
+- SSH config import UI and parser work had already been completed.
+- The command palette/settings work preserved import dialog state wiring rather than regressing it.
+
+Scope note:
+- This retry task did not re-run import parsing against a live ~/.ssh/config sample.

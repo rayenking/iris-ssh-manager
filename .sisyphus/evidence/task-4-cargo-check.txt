@@ -1,0 +1,11 @@
+Task 4 Tauri command handler evidence
+
+Verification basis:
+- Current `cargo check` passed on 2026-04-27.
+- Command modules are part of the compiled Tauri backend.
+
+Relevant completed-session context being summarized truthfully:
+- Capability configuration and command wiring were previously fixed and the crate still compiles after those changes.
+
+Result:
+- PASS for compile verification.

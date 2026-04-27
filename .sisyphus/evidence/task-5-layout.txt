@@ -1,0 +1,17 @@
+Task 5 frontend shell / layout evidence
+
+Fresh verification run:
+- Command: npx tsc --noEmit
+- Result: PASS
+- Command: npm run build
+- Result: PASS (Vite production build completed)
+
+What this proves now:
+- The React/TypeScript layout shell compiles cleanly.
+- The current production bundle builds without frontend type or syntax errors.
+
+Prior completed-session facts summarized here:
+- Task 5 introduced the main shell/layout UI and was later kept compatible with the settings and command-palette work.
+
+Not re-created now:
+- No screenshot evidence was regenerated in this retry task.

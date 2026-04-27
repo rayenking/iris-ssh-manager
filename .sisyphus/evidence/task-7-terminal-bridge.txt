@@ -1,0 +1,15 @@
+Task 7 terminal bridge evidence summary
+
+Fresh verification basis:
+- cargo check: PASS
+- npx tsc --noEmit: PASS
+- npm run build: PASS
+
+Completed-session facts summarized from notepad context:
+- Terminal bridge work used Tauri channel-based session streaming rather than event emission.
+- Major keyboard shortcuts were later wired, including active-tab closing, without breaking the build.
+- Terminal settings now apply live in `src/components/terminal/TerminalView.tsx` through the settings store.
+
+Environment limits for this retry:
+- No live Tauri runtime + SSH session was re-run.
+- No terminal screenshot was fabricated or recreated.

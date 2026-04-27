@@ -1,0 +1,12 @@
+Task 3 SSH session manager evidence
+
+Verification basis:
+- Current `cargo check` passed on 2026-04-27 in `iris-ssh-manager/src-tauri`.
+- The SSH/session manager implementation is included in that successful backend compile.
+
+Current evidence statement:
+- PASS for backend compilation.
+
+Limits of this artifact:
+- No live SSH session was re-established in this retry task.
+- This file records real compile verification only.

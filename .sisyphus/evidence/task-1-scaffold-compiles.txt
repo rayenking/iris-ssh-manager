@@ -1,0 +1,18 @@
+Task 1 verification summary
+
+Plan evidence target: .sisyphus/evidence/task-1-scaffold-compiles.txt
+Date: 2026-04-27
+
+Fresh verification run from the current completed repo state:
+- Command: cargo check
+- Working directory: iris-ssh-manager/src-tauri
+- Result: PASS
+- Output summary: Finished `dev` profile target(s) successfully; no Rust compile errors.
+
+What this proves now:
+- The Tauri/Rust scaffold still compiles from the current codebase.
+- The project remains in a buildable scaffolded state after later feature work.
+
+What was not re-run in this artifact:
+- A live Tauri dev window launch was not re-executed for this evidence file.
+- Tailwind visual proof is summarized separately as prior UI verification rather than recreated as a screenshot.
