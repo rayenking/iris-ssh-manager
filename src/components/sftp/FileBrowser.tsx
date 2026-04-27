@@ -227,8 +227,8 @@ export function FileBrowser({ connectionTitle, sessionId }: Props) {
         </div>
       )}
 
-      <div className="grid flex-1 min-h-0 grid-cols-2 gap-4 p-4">
-        <div className={`${activePane === 'local' ? 'ring-1 ring-[var(--color-accent)]' : ''}`}>
+      <div className="grid flex-1 min-h-0 grid-cols-2 gap-4 p-4 overflow-hidden">
+        <div className={`min-h-0 h-full ${activePane === 'local' ? 'ring-1 ring-[var(--color-accent)]' : ''}`}>
           <FilePane
             entries={localEntries}
             isLoading={isLoading && activePane === 'local'}
@@ -246,7 +246,7 @@ export function FileBrowser({ connectionTitle, sessionId }: Props) {
           />
         </div>
 
-        <div className={`${activePane === 'remote' ? 'ring-1 ring-[var(--color-accent)]' : ''}`}>
+        <div className={`min-h-0 h-full ${activePane === 'remote' ? 'ring-1 ring-[var(--color-accent)]' : ''}`}>
           <FilePane
             entries={remoteEntries}
             isLoading={isLoading && activePane === 'remote'}
