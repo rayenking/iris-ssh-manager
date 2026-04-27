@@ -149,9 +149,9 @@ function App() {
         {activeTab ? (
           <div className="relative flex-1 min-h-0 overflow-hidden">
             {tabs.map((tab) => (
-              <div
+                <div
                 key={tab.id}
-                className={`absolute inset-0 ${activeTabId === tab.id ? 'block' : 'hidden'}`}
+                className={`absolute inset-0 flex flex-col ${activeTabId === tab.id ? '' : 'hidden'}`}
               >
                 {tab.kind === 'terminal' ? (
                   <TerminalView connectionId={tab.connectionId} tabId={tab.id} />
