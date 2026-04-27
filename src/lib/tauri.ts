@@ -48,4 +48,16 @@ export const tauriApi = {
 
   importSshConfig: (configPath: string | null, hostAliases: string[]): Promise<Connection[]> =>
     invoke('import_ssh_config', { configPath, hostAliases }),
+
+  storeCredential: (connectionId: string, secret: string): Promise<void> =>
+    invoke('store_credential', { connectionId, secret }),
+
+  retrieveCredential: (connectionId: string): Promise<string | null> =>
+    invoke('retrieve_credential', { connectionId }),
+
+  deleteCredential: (connectionId: string): Promise<void> =>
+    invoke('delete_credential', { connectionId }),
+
+  hasCredential: (connectionId: string): Promise<boolean> =>
+    invoke('has_credential', { connectionId }),
 };

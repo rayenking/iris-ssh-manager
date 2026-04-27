@@ -9,7 +9,7 @@ interface ConnectionState {
   searchQuery: string;
   
   fetchConnections: () => Promise<void>;
-  createConnection: (data: CreateConnectionInput) => Promise<void>;
+  createConnection: (data: CreateConnectionInput) => Promise<Connection>;
   updateConnection: (id: string, data: UpdateConnectionInput) => Promise<void>;
   deleteConnection: (id: string) => Promise<void>;
   setSelected: (id: string | null) => void;
@@ -41,6 +41,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     try {
       const newConnection = await tauriApi.createConnection(data);
       set((state) => ({ connections: [...state.connections, newConnection] }));
+      return newConnection;
     } catch (error) {
       console.error('Failed to create connection:', error);
       throw error;

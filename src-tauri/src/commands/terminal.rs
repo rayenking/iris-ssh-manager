@@ -18,7 +18,14 @@ pub async fn ssh_connect(
         .map_err(|error| error.to_string())?
         .ok_or_else(|| format!("connection not found: {connection_id}"))?;
 
-    let auth = build_auth_method(&connection.auth_method, connection.private_key_path)?;
+    let auth = if connection.auth_method == "password" {
+        let password = crate::keychain::retrieve_credential(&connection_id)
+            .map_err(|e| format!("keychain error: {e}"))?
+            .unwrap_or_default();
+        AuthMethod::Password(password)
+    } else {
+        build_auth_method(&connection.auth_method, connection.private_key_path)?
+    };
     let mut session = SshSession::connect(
         &connection.hostname,
         connection.port as u16,

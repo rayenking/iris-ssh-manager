@@ -36,6 +36,7 @@ pub async fn update_connection(
 
 #[tauri::command]
 pub async fn delete_connection(db: State<'_, DbState>, id: String) -> Result<(), String> {
+    let _ = crate::keychain::delete_credential(&id);
     ConnectionRepo::delete(&db.0, &id).map_err(|error| error.to_string())
 }
 

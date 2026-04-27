@@ -1,7 +1,8 @@
 import { useState, FormEvent, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, ShieldCheck } from 'lucide-react';
 import { Connection, AuthMethod, CreateConnectionInput, UpdateConnectionInput } from '../../types/connection';
 import { useConnectionStore } from '../../stores/connectionStore';
+import { tauriApi } from '../../lib/tauri';
 
 interface Props {
   connection?: Connection | null;
@@ -10,12 +11,14 @@ interface Props {
 
 export function ConnectionForm({ connection, onClose }: Props) {
   const { createConnection, updateConnection, groups } = useConnectionStore();
+  const [hasKeychainCredential, setHasKeychainCredential] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     hostname: '',
     port: '22',
     username: 'root',
     authMethod: 'password' as AuthMethod,
+    password: '',
     privateKeyPath: '',
     groupId: '',
     colorTag: '',
@@ -30,11 +33,13 @@ export function ConnectionForm({ connection, onClose }: Props) {
         port: connection.port.toString(),
         username: connection.username,
         authMethod: connection.authMethod,
+        password: '',
         privateKeyPath: connection.privateKeyPath || '',
         groupId: connection.groupId || '',
         colorTag: connection.colorTag || '',
         startupCommand: connection.startupCommand || ''
       });
+      tauriApi.hasCredential(connection.id).then(setHasKeychainCredential).catch(() => {});
     }
   }, [connection]);
 
@@ -42,8 +47,9 @@ export function ConnectionForm({ connection, onClose }: Props) {
     e.preventDefault();
     if (!formData.name || !formData.hostname || !formData.username) return;
 
+    const { password, ...rest } = formData;
     const data = {
-      ...formData,
+      ...rest,
       port: parseInt(formData.port, 10) || 22,
       groupId: formData.groupId || undefined,
       privateKeyPath: formData.privateKeyPath || undefined,
@@ -52,10 +58,16 @@ export function ConnectionForm({ connection, onClose }: Props) {
     };
 
     try {
+      let savedId: string;
       if (connection) {
         await updateConnection(connection.id, data as UpdateConnectionInput);
+        savedId = connection.id;
       } else {
-        await createConnection(data as CreateConnectionInput);
+        const created = await createConnection(data as CreateConnectionInput);
+        savedId = created.id;
+      }
+      if (formData.authMethod === 'password' && password) {
+        await tauriApi.storeCredential(savedId, password);
       }
       onClose();
     } catch (err) {
@@ -134,6 +146,25 @@ export function ConnectionForm({ connection, onClose }: Props) {
                 <option value="agent">SSH Agent</option>
               </select>
             </div>
+
+            {formData.authMethod === 'password' && (
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">Password</label>
+                <input 
+                  type="password" 
+                  placeholder={hasKeychainCredential ? '••••••••' : 'Enter password'}
+                  value={formData.password} 
+                  onChange={e => setFormData({...formData, password: e.target.value})}
+                  className="w-full bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-sm rounded px-3 py-2 focus:outline-none focus:border-[var(--color-accent)]" 
+                />
+                {hasKeychainCredential && !formData.password && (
+                  <div className="flex items-center gap-1 mt-1 text-xs text-[var(--color-text-muted)]">
+                    <ShieldCheck className="w-3 h-3" />
+                    <span>Saved in keychain</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {formData.authMethod === 'publicKey' && (
               <div>

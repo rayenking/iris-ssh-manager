@@ -46,7 +46,11 @@ pub fn run() {
             commands::terminal::ssh_write,
             commands::terminal::ssh_resize,
             commands::config::parse_ssh_config,
-            commands::config::import_ssh_config
+            commands::config::import_ssh_config,
+            commands::keychain::store_credential,
+            commands::keychain::retrieve_credential,
+            commands::keychain::delete_credential,
+            commands::keychain::has_credential
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
