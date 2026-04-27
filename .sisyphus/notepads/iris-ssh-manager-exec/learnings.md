@@ -1,0 +1,1 @@
+- Restored `appimage` in `src-tauri/tauri.conf.json` bundle targets for plan compliance. On Arch Linux, local AppImage bundling still fails inside cached `linuxdeploy-x86_64.AppImage` because its embedded `strip` cannot process RELR-enabled `.relr.dyn` sections from modern system libraries; Ubuntu CI AppImage builds remain the reliable path.
