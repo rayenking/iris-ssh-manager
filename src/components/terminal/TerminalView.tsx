@@ -129,28 +129,36 @@ export function TerminalView({
     let lastCols = 0;
     let lastRows = 0;
     let disposed = false;
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
     const syncRemoteSize = () => {
       if (disposed) return;
 
-      const currentTerminal = terminalRef.current;
-      const currentSessionId = sessionIdRef.current;
-      const currentFitAddon = fitAddonRef.current;
+      if (resizeTimer) clearTimeout(resizeTimer);
 
-      if (!currentTerminal || !currentSessionId || !currentFitAddon) {
-        return;
-      }
+      resizeTimer = setTimeout(() => {
+        resizeTimer = null;
+        if (disposed) return;
 
-      currentFitAddon.fit();
+        const currentTerminal = terminalRef.current;
+        const currentSessionId = sessionIdRef.current;
+        const currentFitAddon = fitAddonRef.current;
 
-      if (currentTerminal.cols === lastCols && currentTerminal.rows === lastRows) {
-        return;
-      }
+        if (!currentTerminal || !currentSessionId || !currentFitAddon) {
+          return;
+        }
 
-      lastCols = currentTerminal.cols;
-      lastRows = currentTerminal.rows;
+        currentFitAddon.fit();
 
-      void resize(currentSessionId, currentTerminal.cols, currentTerminal.rows).catch(() => {});
+        if (currentTerminal.cols === lastCols && currentTerminal.rows === lastRows) {
+          return;
+        }
+
+        lastCols = currentTerminal.cols;
+        lastRows = currentTerminal.rows;
+
+        void resize(currentSessionId, currentTerminal.cols, currentTerminal.rows).catch(() => {});
+      }, 50);
     };
 
     const applyTerminalSettings = () => {
@@ -184,6 +192,7 @@ export function TerminalView({
 
     return () => {
       disposed = true;
+      if (resizeTimer) clearTimeout(resizeTimer);
       window.removeEventListener('resize', syncRemoteSize);
       resizeObserver.disconnect();
       handleTerminalData.dispose();
