@@ -128,8 +128,11 @@ export function TerminalView({
 
     let lastCols = 0;
     let lastRows = 0;
+    let disposed = false;
 
     const syncRemoteSize = () => {
+      if (disposed) return;
+
       const currentTerminal = terminalRef.current;
       const currentSessionId = sessionIdRef.current;
       const currentFitAddon = fitAddonRef.current;
@@ -180,6 +183,7 @@ export function TerminalView({
     window.addEventListener('resize', syncRemoteSize);
 
     return () => {
+      disposed = true;
       window.removeEventListener('resize', syncRemoteSize);
       resizeObserver.disconnect();
       handleTerminalData.dispose();
