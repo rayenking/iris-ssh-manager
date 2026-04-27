@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { AppTab, TabStatus, TerminalTab } from '../types/terminal';
+import { getPrimaryPaneId, useSplitStore } from './splitStore';
 
 interface TerminalState {
   tabs: AppTab[];
@@ -30,6 +31,9 @@ export const useTerminalStore = create<TerminalState>((set) => ({
       kind: 'terminal',
       status: 'connecting',
     };
+
+    useSplitStore.getState().initSplit(newTab.id, connectionId);
+    useSplitStore.getState().setFocusedPane(newTab.id);
 
     set((state) => ({
       tabs: [...state.tabs, newTab],
@@ -66,8 +70,11 @@ export const useTerminalStore = create<TerminalState>((set) => ({
     set((state) => {
       const targetTab = state.tabs.find((tab) => tab.id === id);
       const tabsToRemove = new Set<string>([id]);
+      const splitStore = useSplitStore.getState();
 
       if (targetTab?.kind === 'terminal') {
+        splitStore.removeSplit(id);
+
         state.tabs.forEach((tab) => {
           if (tab.kind === 'files' && tab.terminalTabId === id) {
             tabsToRemove.add(tab.id);
@@ -77,19 +84,40 @@ export const useTerminalStore = create<TerminalState>((set) => ({
 
       const newTabs = state.tabs.filter((tab) => !tabsToRemove.has(tab.id));
       const activeTabRemoved = state.activeTabId ? tabsToRemove.has(state.activeTabId) : false;
+      const nextActiveTabId = activeTabRemoved
+        ? newTabs.length > 0
+          ? newTabs[newTabs.length - 1].id
+          : null
+        : state.activeTabId;
+
+      if (nextActiveTabId) {
+        const nextActiveTab = newTabs.find((tab) => tab.id === nextActiveTabId);
+
+        if (nextActiveTab?.kind === 'terminal') {
+          const nextTree = splitStore.getSplitTree(nextActiveTab.id);
+          splitStore.setFocusedPane(nextTree ? getPrimaryPaneId(nextTree) : nextActiveTab.id);
+        }
+      }
 
       return {
         tabs: newTabs,
-        activeTabId: activeTabRemoved
-          ? newTabs.length > 0
-            ? newTabs[newTabs.length - 1].id
-            : null
-          : state.activeTabId,
+        activeTabId: nextActiveTabId,
       };
     });
   },
 
-  setActiveTab: (id) => set({ activeTabId: id }),
+  setActiveTab: (id) => {
+    const { tabs } = useTerminalStore.getState();
+    const targetTab = tabs.find((tab) => tab.id === id);
+
+    if (targetTab?.kind === 'terminal') {
+      const splitStore = useSplitStore.getState();
+      const splitTree = splitStore.getSplitTree(id);
+      splitStore.setFocusedPane(splitTree ? getPrimaryPaneId(splitTree) : id);
+    }
+
+    set({ activeTabId: id });
+  },
 
   updateTabStatus: (id, status) => {
     set((state) => ({

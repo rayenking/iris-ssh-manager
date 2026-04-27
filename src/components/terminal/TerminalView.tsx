@@ -10,10 +10,16 @@ import { useTerminalStore } from '../../stores/terminalStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { TunnelManager } from '../tunnels/TunnelManager';
 import { RotateCw, Network } from 'lucide-react';
+import type { TabStatus } from '../../types/terminal';
 
 interface Props {
   connectionId: string;
   tabId: string;
+  paneId?: string;
+  reportTabState?: boolean;
+  isFocusedPane?: boolean;
+  onStatusChange?: (status: TabStatus) => void;
+  onSessionChange?: (sessionId?: string) => void;
 }
 
 function getTerminalTheme() {
@@ -27,7 +33,15 @@ function getTerminalTheme() {
   };
 }
 
-export function TerminalView({ connectionId, tabId }: Props) {
+export function TerminalView({
+  connectionId,
+  tabId,
+  paneId = tabId,
+  reportTabState = true,
+  isFocusedPane = true,
+  onStatusChange,
+  onSessionChange,
+}: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -36,10 +50,30 @@ export function TerminalView({ connectionId, tabId }: Props) {
   const encoderRef = useRef(new TextEncoder());
   const reconnectAttemptRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const statusChangeRef = useRef<(status: TabStatus) => void>(() => {});
+  const sessionChangeRef = useRef<(sessionId?: string) => void>(() => {});
   const [tunnelPanelOpen, setTunnelPanelOpen] = useState(false);
   const { connect, disconnect, write, resize, connectionState, error } = useSSH();
   const { updateTabStatus, setTabSessionId } = useTerminalStore();
   const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer, autoReconnect } = useSettingsStore();
+
+  useEffect(() => {
+    statusChangeRef.current = onStatusChange
+      ?? (reportTabState ? (status) => updateTabStatus(tabId, status) : () => {});
+  }, [onStatusChange, reportTabState, tabId, updateTabStatus]);
+
+  useEffect(() => {
+    sessionChangeRef.current = onSessionChange
+      ?? (reportTabState ? (sessionId) => setTabSessionId(tabId, sessionId) : () => {});
+  }, [onSessionChange, reportTabState, setTabSessionId, tabId]);
+
+  const emitStatusChange = useCallback((status: TabStatus) => {
+    statusChangeRef.current(status);
+  }, []);
+
+  const emitSessionChange = useCallback((sessionId?: string) => {
+    sessionChangeRef.current(sessionId);
+  }, []);
 
   useEffect(() => {
     const terminalHost = terminalHostRef.current;
@@ -92,6 +126,9 @@ export function TerminalView({ connectionId, tabId }: Props) {
       });
     });
 
+    let lastCols = 0;
+    let lastRows = 0;
+
     const syncRemoteSize = () => {
       const currentTerminal = terminalRef.current;
       const currentSessionId = sessionIdRef.current;
@@ -102,9 +139,15 @@ export function TerminalView({ connectionId, tabId }: Props) {
       }
 
       currentFitAddon.fit();
-      void resize(currentSessionId, currentTerminal.cols, currentTerminal.rows).catch((resizeError) => {
-        console.error('Failed to resize terminal:', resizeError);
-      });
+
+      if (currentTerminal.cols === lastCols && currentTerminal.rows === lastRows) {
+        return;
+      }
+
+      lastCols = currentTerminal.cols;
+      lastRows = currentTerminal.rows;
+
+      void resize(currentSessionId, currentTerminal.cols, currentTerminal.rows).catch(() => {});
     };
 
     const applyTerminalSettings = () => {
@@ -164,11 +207,42 @@ export function TerminalView({ connectionId, tabId }: Props) {
     fitAddon.fit();
   }, [cursorBlink, cursorStyle, scrollbackBuffer, terminalFont, terminalFontSize]);
 
+  // Re-render xterm canvas when this tab becomes active again.
+  // WebGL context is lost when the container is hidden (display:none),
+  // so we need to fit + refresh when the tab is shown again.
+  const { activeTabId: currentActiveTabId } = useTerminalStore();
+  const isActive = currentActiveTabId === tabId;
+  const wasActiveRef = useRef(isActive);
+
+  useEffect(() => {
+    if (isActive && isFocusedPane && !wasActiveRef.current) {
+      requestAnimationFrame(() => {
+        const terminal = terminalRef.current;
+        const fitAddon = fitAddonRef.current;
+        if (!terminal || !fitAddon) return;
+        fitAddon.fit();
+        terminal.refresh(0, terminal.rows - 1);
+        terminal.focus();
+      });
+    }
+    wasActiveRef.current = isActive;
+  }, [isActive, isFocusedPane]);
+
+  useEffect(() => {
+    if (!isActive || !isFocusedPane) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      terminalRef.current?.focus();
+    });
+  }, [isActive, isFocusedPane]);
+
   const doConnect = useCallback(async () => {
     const terminal = terminalRef.current;
     if (!terminal) return;
 
-    updateTabStatus(tabId, 'connecting');
+    emitStatusChange('connecting');
 
     try {
       const sessionId = await connect(connectionId, (data) => {
@@ -176,8 +250,8 @@ export function TerminalView({ connectionId, tabId }: Props) {
       });
 
       sessionIdRef.current = sessionId;
-      setTabSessionId(tabId, sessionId);
-      updateTabStatus(tabId, 'connected');
+      emitSessionChange(sessionId);
+      emitStatusChange('connected');
       reconnectAttemptRef.current = 0;
 
       requestAnimationFrame(() => {
@@ -190,18 +264,18 @@ export function TerminalView({ connectionId, tabId }: Props) {
     } catch (connectError) {
       console.error('Failed to connect SSH terminal:', connectError);
     }
-  }, [connect, connectionId, resize, setTabSessionId, tabId, updateTabStatus]);
+  }, [connect, connectionId, emitSessionChange, emitStatusChange, resize]);
 
   const handleReconnect = useCallback(() => {
     const oldSessionId = sessionIdRef.current;
     sessionIdRef.current = null;
-    setTabSessionId(tabId, undefined);
+    emitSessionChange(undefined);
     if (oldSessionId) {
       void disconnect(oldSessionId).catch(() => {});
     }
     terminalRef.current?.write('\r\n\x1b[33mReconnecting...\x1b[0m\r\n');
     void doConnect();
-  }, [disconnect, doConnect, setTabSessionId, tabId]);
+  }, [disconnect, doConnect, emitSessionChange]);
 
   useEffect(() => {
     void doConnect();
@@ -213,13 +287,13 @@ export function TerminalView({ connectionId, tabId }: Props) {
       }
       const sessionId = sessionIdRef.current;
       sessionIdRef.current = null;
-      setTabSessionId(tabId, undefined);
-      updateTabStatus(tabId, 'disconnected');
+      emitSessionChange(undefined);
+      emitStatusChange('disconnected');
       if (sessionId) {
         void disconnect(sessionId).catch(() => {});
       }
     };
-  }, [doConnect, disconnect, setTabSessionId, tabId, updateTabStatus]);
+  }, [disconnect, doConnect, emitSessionChange, emitStatusChange]);
 
   useEffect(() => {
     if (connectionState !== 'disconnected' || !autoReconnect) return;
@@ -246,25 +320,34 @@ export function TerminalView({ connectionId, tabId }: Props) {
 
   useEffect(() => {
     if (connectionState === 'error') {
-      updateTabStatus(tabId, 'error');
+      emitStatusChange('error');
       return;
     }
 
     if (connectionState === 'connected') {
-      updateTabStatus(tabId, 'connected');
+      emitStatusChange('connected');
       return;
     }
 
     if (connectionState === 'connecting') {
-      updateTabStatus(tabId, 'connecting');
+      emitStatusChange('connecting');
       return;
     }
 
-    updateTabStatus(tabId, 'disconnected');
-  }, [connectionState, tabId, updateTabStatus]);
+    emitStatusChange('disconnected');
+  }, [connectionState, emitStatusChange]);
+
+  useEffect(() => {
+    if (!reportTabState) {
+      return;
+    }
+
+    emitStatusChange(connectionState);
+    emitSessionChange(sessionIdRef.current ?? undefined);
+  }, [connectionState, emitSessionChange, emitStatusChange, reportTabState]);
 
   return (
-    <div ref={containerRef} className="relative flex h-full w-full min-h-0 flex-1 bg-[var(--color-bg-primary)]">
+    <div ref={containerRef} data-pane-id={paneId} className="relative flex h-full w-full min-h-0 flex-1 bg-[var(--color-bg-primary)]">
       <div className="relative flex-1 min-w-0 flex flex-col h-full">
         <div ref={terminalHostRef} className="flex-1 min-h-0 overflow-hidden px-1 py-1" />
 
