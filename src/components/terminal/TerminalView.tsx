@@ -4,11 +4,12 @@ import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSSH } from '../../hooks/useSSH';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { TunnelManager } from '../tunnels/TunnelManager';
+import { RotateCw, Network } from 'lucide-react';
 
 interface Props {
   connectionId: string;
@@ -33,9 +34,12 @@ export function TerminalView({ connectionId, tabId }: Props) {
   const fitAddonRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const encoderRef = useRef(new TextEncoder());
+  const reconnectAttemptRef = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [tunnelPanelOpen, setTunnelPanelOpen] = useState(false);
   const { connect, disconnect, write, resize, connectionState, error } = useSSH();
   const { updateTabStatus, setTabSessionId } = useTerminalStore();
-  const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer } = useSettingsStore();
+  const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer, autoReconnect } = useSettingsStore();
 
   useEffect(() => {
     const terminalHost = terminalHostRef.current;
@@ -71,7 +75,10 @@ export function TerminalView({ connectionId, tabId }: Props) {
       console.warn('xterm renderer fallback: DOM', webglError);
     }
 
-    fitAddon.fit();
+    // Delay initial fit to ensure the container has been laid out by the browser
+    requestAnimationFrame(() => {
+      fitAddon.fit();
+    });
 
     const handleTerminalData = terminal.onData((value) => {
       const sessionId = sessionIdRef.current;
@@ -158,67 +165,85 @@ export function TerminalView({ connectionId, tabId }: Props) {
     fitAddon.fit();
   }, [cursorBlink, cursorStyle, scrollbackBuffer, terminalFont, terminalFontSize]);
 
-  useEffect(() => {
-    let isDisposed = false;
+  const doConnect = useCallback(async () => {
+    const terminal = terminalRef.current;
+    if (!terminal) return;
 
-    async function startSession() {
-      const terminal = terminalRef.current;
+    updateTabStatus(tabId, 'connecting');
 
-      if (!terminal) {
-        return;
-      }
+    try {
+      const sessionId = await connect(connectionId, (data) => {
+        terminalRef.current?.write(new Uint8Array(data));
+      });
 
-      updateTabStatus(tabId, 'connecting');
+      sessionIdRef.current = sessionId;
+      setTabSessionId(tabId, sessionId);
+      updateTabStatus(tabId, 'connected');
+      reconnectAttemptRef.current = 0;
 
-      try {
-        const sessionId = await connect(connectionId, (data) => {
-          terminalRef.current?.write(new Uint8Array(data));
-        });
-
-        if (isDisposed) {
-          await disconnect(sessionId);
-          return;
-        }
-
-        sessionIdRef.current = sessionId;
-        setTabSessionId(tabId, sessionId);
-        updateTabStatus(tabId, 'connected');
-
-        requestAnimationFrame(() => {
-          const currentTerminal = terminalRef.current;
-          const fitAddon = fitAddonRef.current;
-
-          if (!currentTerminal || !fitAddon || !sessionIdRef.current) {
-            return;
-          }
-
-          fitAddon.fit();
-          void resize(sessionIdRef.current, currentTerminal.cols, currentTerminal.rows).catch((resizeError) => {
-            console.error('Failed to send initial terminal size:', resizeError);
-          });
-        });
-      } catch (connectError) {
-        console.error('Failed to connect SSH terminal:', connectError);
-      }
+      requestAnimationFrame(() => {
+        const t = terminalRef.current;
+        const f = fitAddonRef.current;
+        if (!t || !f || !sessionIdRef.current) return;
+        f.fit();
+        void resize(sessionIdRef.current, t.cols, t.rows).catch(() => {});
+      });
+    } catch (connectError) {
+      console.error('Failed to connect SSH terminal:', connectError);
     }
+  }, [connect, connectionId, resize, setTabSessionId, tabId, updateTabStatus]);
 
-    void startSession();
+  const handleReconnect = useCallback(() => {
+    const oldSessionId = sessionIdRef.current;
+    sessionIdRef.current = null;
+    setTabSessionId(tabId, undefined);
+    if (oldSessionId) {
+      void disconnect(oldSessionId).catch(() => {});
+    }
+    terminalRef.current?.write('\r\n\x1b[33mReconnecting...\x1b[0m\r\n');
+    void doConnect();
+  }, [disconnect, doConnect, setTabSessionId, tabId]);
+
+  useEffect(() => {
+    void doConnect();
 
     return () => {
-      isDisposed = true;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       const sessionId = sessionIdRef.current;
-
       sessionIdRef.current = null;
       setTabSessionId(tabId, undefined);
       updateTabStatus(tabId, 'disconnected');
-
       if (sessionId) {
-        void disconnect(sessionId).catch((disconnectError) => {
-          console.error('Failed to disconnect SSH terminal on unmount:', disconnectError);
-        });
+        void disconnect(sessionId).catch(() => {});
       }
     };
-  }, [connect, connectionId, disconnect, resize, setTabSessionId, tabId, updateTabStatus]);
+  }, [doConnect, disconnect, setTabSessionId, tabId, updateTabStatus]);
+
+  useEffect(() => {
+    if (connectionState !== 'disconnected' || !autoReconnect) return;
+    if (!sessionIdRef.current && reconnectAttemptRef.current === 0) return;
+
+    const attempt = reconnectAttemptRef.current + 1;
+    const delay = Math.min(1000 * Math.pow(2, attempt - 1), 30000);
+    reconnectAttemptRef.current = attempt;
+
+    terminalRef.current?.write(`\r\n\x1b[33mAuto-reconnect in ${delay / 1000}s (attempt ${attempt})...\x1b[0m\r\n`);
+
+    reconnectTimerRef.current = setTimeout(() => {
+      reconnectTimerRef.current = null;
+      handleReconnect();
+    }, delay);
+
+    return () => {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+    };
+  }, [connectionState, autoReconnect, handleReconnect]);
 
   useEffect(() => {
     if (connectionState === 'error') {
@@ -240,31 +265,64 @@ export function TerminalView({ connectionId, tabId }: Props) {
   }, [connectionState, tabId, updateTabStatus]);
 
   return (
-    <div ref={containerRef} className="relative flex h-full min-h-0 flex-1 bg-[var(--color-bg-primary)]">
-      <div ref={terminalHostRef} className="h-full min-w-0 flex-1 px-4 py-3" />
-      <TunnelManager sessionId={sessionIdRef.current} />
+    <div ref={containerRef} className="relative flex h-full w-full min-h-0 flex-1 bg-[var(--color-bg-primary)]">
+      <div className="relative flex-1 min-w-0 flex flex-col h-full">
+        <div ref={terminalHostRef} className="flex-1 min-h-0 overflow-hidden px-1 py-1" />
 
-      {connectionState === 'connecting' && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-bg-primary)_82%,transparent)]">
-          <div className="rounded border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2 text-sm text-[var(--color-text-secondary)] shadow-lg">
-            Connecting...
+        {connectionState === 'connected' && (
+          <button
+            type="button"
+            onClick={() => setTunnelPanelOpen(prev => !prev)}
+            className={`absolute top-2 right-2 z-10 rounded p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] transition-colors ${tunnelPanelOpen ? 'bg-[var(--color-hover)] text-[var(--color-text-primary)]' : ''}`}
+            title="Toggle tunnels panel"
+          >
+            <Network className="w-4 h-4" />
+          </button>
+        )}
+
+        {connectionState === 'connecting' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-bg-primary)_82%,transparent)]">
+            <div className="rounded border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2 text-sm text-[var(--color-text-secondary)] shadow-lg">
+              Connecting...
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {connectionState === 'disconnected' && !error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-bg-primary)_78%,transparent)]">
-          <div className="rounded border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2 text-sm text-[var(--color-text-muted)] shadow-lg">
-            Disconnected
+        {connectionState === 'disconnected' && !error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-bg-primary)_78%,transparent)]">
+            <div className="flex flex-col items-center gap-3 rounded border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-6 py-4 shadow-lg">
+              <span className="text-sm text-[var(--color-text-muted)]">Disconnected</span>
+              <button
+                type="button"
+                onClick={handleReconnect}
+                className="inline-flex items-center gap-2 rounded bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"
+              >
+                <RotateCw className="w-4 h-4" />
+                Reconnect
+              </button>
+              {autoReconnect && (
+                <span className="text-xs text-[var(--color-text-muted)]">Auto-reconnect is enabled</span>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {error && (
-        <div className="absolute inset-x-4 top-4 rounded border border-[var(--color-error)] bg-[color-mix(in_srgb,var(--color-error)_10%,var(--color-bg-secondary))] px-4 py-3 text-sm text-[var(--color-error)] shadow-lg">
-          {error}
-        </div>
-      )}
+        {error && (
+          <div className="absolute inset-x-4 top-4 z-10 flex items-center justify-between rounded border border-[var(--color-error)] bg-[color-mix(in_srgb,var(--color-error)_10%,var(--color-bg-secondary))] px-4 py-3 shadow-lg">
+            <span className="text-sm text-[var(--color-error)]">{error}</span>
+            <button
+              type="button"
+              onClick={handleReconnect}
+              className="ml-4 inline-flex items-center gap-1.5 rounded bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 transition-opacity"
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+              Retry
+            </button>
+          </div>
+        )}
+      </div>
+
+      {tunnelPanelOpen && <TunnelManager sessionId={sessionIdRef.current} />}
     </div>
   );
 }
