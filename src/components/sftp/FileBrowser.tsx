@@ -27,9 +27,29 @@ interface Props {
   sessionId: string;
 }
 
+function useNavHistory(initialPath: string) {
+  const [history, setHistory] = useState<string[]>([initialPath]);
+  const [index, setIndex] = useState(0);
+
+  const navigate = useCallback((path: string) => {
+    setHistory(prev => [...prev.slice(0, index + 1), path]);
+    setIndex(prev => prev + 1);
+  }, [index]);
+
+  const goBack = useCallback(() => {
+    if (index > 0) setIndex(prev => prev - 1);
+  }, [index]);
+
+  const goForward = useCallback(() => {
+    setIndex(prev => Math.min(prev + 1, history.length - 1));
+  }, [history.length]);
+
+  return { current: history[index] ?? initialPath, history, index, navigate, goBack, goForward };
+}
+
 export function FileBrowser({ connectionTitle, sessionId }: Props) {
-  const [localPath, setLocalPath] = useState('');
-  const [remotePath, setRemotePath] = useState('.');
+  const localNav = useNavHistory('');
+  const remoteNav = useNavHistory('.');
   const [localEntries, setLocalEntries] = useState<FileEntry[]>([]);
   const [remoteEntries, setRemoteEntries] = useState<FileEntry[]>([]);
   const [activePane, setActivePane] = useState<PaneKind>('remote');
@@ -43,16 +63,48 @@ export function FileBrowser({ connectionTitle, sessionId }: Props) {
   const refreshLocal = useCallback(async (path: string) => {
     const entries = await listLocalDir(path);
     setLocalEntries(entries);
-    setLocalPath(path);
     setLocalSelection([]);
   }, [listLocalDir]);
 
   const refreshRemote = useCallback(async (path: string) => {
     const entries = await listDir(sessionId, path);
     setRemoteEntries(entries);
-    setRemotePath(path);
     setRemoteSelection([]);
   }, [listDir, sessionId]);
+
+  const navigateLocal = useCallback((path: string) => {
+    localNav.navigate(path);
+    void refreshLocal(path);
+  }, [localNav, refreshLocal]);
+
+  const navigateRemote = useCallback((path: string) => {
+    remoteNav.navigate(path);
+    void refreshRemote(path);
+  }, [remoteNav, refreshRemote]);
+
+  const goBackLocal = useCallback(() => {
+    localNav.goBack();
+    const prev = localNav.history[localNav.index - 1];
+    if (prev) void refreshLocal(prev);
+  }, [localNav, refreshLocal]);
+
+  const goForwardLocal = useCallback(() => {
+    localNav.goForward();
+    const next = localNav.history[localNav.index + 1];
+    if (next) void refreshLocal(next);
+  }, [localNav, refreshLocal]);
+
+  const goBackRemote = useCallback(() => {
+    remoteNav.goBack();
+    const prev = remoteNav.history[remoteNav.index - 1];
+    if (prev) void refreshRemote(prev);
+  }, [remoteNav, refreshRemote]);
+
+  const goForwardRemote = useCallback(() => {
+    remoteNav.goForward();
+    const next = remoteNav.history[remoteNav.index + 1];
+    if (next) void refreshRemote(next);
+  }, [remoteNav, refreshRemote]);
 
   useEffect(() => {
     let isMounted = true;
@@ -60,15 +112,12 @@ export function FileBrowser({ connectionTitle, sessionId }: Props) {
     async function initialize() {
       try {
         const initialLocalPath = await homeDir();
-        if (!isMounted) {
-          return;
-        }
+        if (!isMounted) return;
 
+        localNav.navigate(initialLocalPath);
         await Promise.all([refreshLocal(initialLocalPath), refreshRemote('.')]);
       } catch (loadError) {
-        if (!isMounted) {
-          return;
-        }
+        if (!isMounted) return;
 
         const message = loadError instanceof Error ? loadError.message : 'Failed to load SFTP browser';
         setBrowserError(message);
@@ -76,10 +125,9 @@ export function FileBrowser({ connectionTitle, sessionId }: Props) {
     }
 
     void initialize();
-    return () => {
-      isMounted = false;
-    };
-  }, [refreshLocal, refreshRemote]);
+    return () => { isMounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectedLocalEntries = useMemo(
     () => localEntries.filter((entry) => localSelection.includes(entry.name)),
@@ -122,77 +170,63 @@ export function FileBrowser({ connectionTitle, sessionId }: Props) {
 
   const handleUpload = useCallback(() => {
     selectedLocalEntries.forEach((entry) => {
-      if (entry.isDir) {
-        return;
-      }
-
-      upload(sessionId, joinPath(localPath, entry.name), joinPath(remotePath, entry.name));
+      if (entry.isDir) return;
+      upload(sessionId, joinPath(localNav.current, entry.name), joinPath(remoteNav.current, entry.name));
     });
-  }, [localPath, remotePath, selectedLocalEntries, sessionId, upload]);
+  }, [localNav.current, remoteNav.current, selectedLocalEntries, sessionId, upload]);
 
   const handleDownload = useCallback(() => {
     selectedRemoteEntries.forEach((entry) => {
-      if (entry.isDir) {
-        return;
-      }
-
-      download(sessionId, joinPath(remotePath, entry.name), joinPath(localPath, entry.name));
+      if (entry.isDir) return;
+      download(sessionId, joinPath(remoteNav.current, entry.name), joinPath(localNav.current, entry.name));
     });
-  }, [download, localPath, remotePath, selectedRemoteEntries, sessionId]);
+  }, [download, localNav.current, remoteNav.current, selectedRemoteEntries, sessionId]);
 
   const handleDelete = useCallback(async () => {
-    if (remoteSelection.length === 0) {
-      return;
-    }
+    if (remoteSelection.length === 0) return;
 
     try {
       for (const name of remoteSelection) {
-        await remove(sessionId, joinPath(remotePath, name));
+        await remove(sessionId, joinPath(remoteNav.current, name));
       }
-      await refreshRemote(remotePath);
+      await refreshRemote(remoteNav.current);
       setBrowserError(null);
     } catch (deleteError) {
       const message = deleteError instanceof Error ? deleteError.message : 'Failed to delete remote selection';
       setBrowserError(message);
     }
-  }, [refreshRemote, remotePath, remoteSelection, remove, sessionId]);
+  }, [refreshRemote, remoteNav.current, remoteSelection, remove, sessionId]);
 
   const handleNewFolder = useCallback(async () => {
     const input = window.prompt('New remote folder name');
-    if (!input) {
-      return;
-    }
+    if (!input) return;
 
     try {
-      await mkdir(sessionId, joinPath(remotePath, input));
-      await refreshRemote(remotePath);
+      await mkdir(sessionId, joinPath(remoteNav.current, input));
+      await refreshRemote(remoteNav.current);
       setBrowserError(null);
     } catch (mkdirError) {
       const message = mkdirError instanceof Error ? mkdirError.message : 'Failed to create remote folder';
       setBrowserError(message);
     }
-  }, [mkdir, refreshRemote, remotePath, sessionId]);
+  }, [mkdir, refreshRemote, remoteNav.current, sessionId]);
 
   const handleRename = useCallback(async () => {
-    if (remoteSelection.length !== 1) {
-      return;
-    }
+    if (remoteSelection.length !== 1) return;
 
     const currentName = remoteSelection[0];
     const nextName = window.prompt('Rename remote item', currentName);
-    if (!nextName || nextName === currentName) {
-      return;
-    }
+    if (!nextName || nextName === currentName) return;
 
     try {
-      await rename(sessionId, joinPath(remotePath, currentName), joinPath(remotePath, nextName));
-      await refreshRemote(remotePath);
+      await rename(sessionId, joinPath(remoteNav.current, currentName), joinPath(remoteNav.current, nextName));
+      await refreshRemote(remoteNav.current);
       setBrowserError(null);
     } catch (renameError) {
       const message = renameError instanceof Error ? renameError.message : 'Failed to rename remote item';
       setBrowserError(message);
     }
-  }, [refreshRemote, remotePath, remoteSelection, rename, sessionId]);
+  }, [refreshRemote, remoteNav.current, remoteSelection, rename, sessionId]);
 
   const toolbarDisabled = useMemo(
     () => ({
@@ -215,8 +249,8 @@ export function FileBrowser({ connectionTitle, sessionId }: Props) {
           <ToolbarButton icon={<FolderPlus className="h-4 w-4" />} label="New Folder" onClick={() => void handleNewFolder()} />
           <ToolbarButton disabled={toolbarDisabled.rename} icon={<Pencil className="h-4 w-4" />} label="Rename" onClick={() => void handleRename()} />
           <ToolbarButton icon={<RefreshCw className="h-4 w-4" />} label="Refresh" onClick={() => {
-            void refreshLocal(localPath);
-            void refreshRemote(remotePath);
+            void refreshLocal(localNav.current);
+            void refreshRemote(remoteNav.current);
           }} />
         </div>
       </div>
@@ -232,13 +266,14 @@ export function FileBrowser({ connectionTitle, sessionId }: Props) {
           <FilePane
             entries={localEntries}
             isLoading={isLoading && activePane === 'local'}
-            onNavigate={(path) => {
-              setActivePane('local');
-              void refreshLocal(path);
-            }}
+            history={localNav.history}
+            historyIndex={localNav.index}
+            onNavigate={(path) => { setActivePane('local'); navigateLocal(path); }}
+            onGoBack={() => { setActivePane('local'); goBackLocal(); }}
+            onGoForward={() => { setActivePane('local'); goForwardLocal(); }}
             onSelect={(name, event) => handleSelect('local', name, event)}
             onSort={(field) => setLocalSort((current) => toggleSort(current, field))}
-            path={localPath}
+            path={localNav.current}
             selectedNames={localSelection}
             sortDirection={localSort.direction}
             sortField={localSort.field}
@@ -250,13 +285,14 @@ export function FileBrowser({ connectionTitle, sessionId }: Props) {
           <FilePane
             entries={remoteEntries}
             isLoading={isLoading && activePane === 'remote'}
-            onNavigate={(path) => {
-              setActivePane('remote');
-              void refreshRemote(path);
-            }}
+            history={remoteNav.history}
+            historyIndex={remoteNav.index}
+            onNavigate={(path) => { setActivePane('remote'); navigateRemote(path); }}
+            onGoBack={() => { setActivePane('remote'); goBackRemote(); }}
+            onGoForward={() => { setActivePane('remote'); goForwardRemote(); }}
             onSelect={(name, event) => handleSelect('remote', name, event)}
             onSort={(field) => setRemoteSort((current) => toggleSort(current, field))}
-            path={remotePath}
+            path={remoteNav.current}
             selectedNames={remoteSelection}
             sortDirection={remoteSort.direction}
             sortField={remoteSort.field}
