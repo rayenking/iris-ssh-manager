@@ -16,7 +16,7 @@ interface PaletteItem {
 }
 
 export function CommandPalette() {
-  const { commandPaletteOpen, toggleCommandPalette, currentTheme, setTheme } = useUiStore();
+  const { commandPaletteOpen, toggleCommandPalette, currentTheme, setTheme, setImportDialogOpen, setSettingsOpen } = useUiStore();
   const { connections } = useConnectionStore();
   const { snippets } = useSnippetStore();
   const { openTab, activeTabId, tabs } = useTerminalStore();
@@ -83,8 +83,7 @@ export function CommandPalette() {
       type: 'action',
       icon: <RefreshCw className="w-4 h-4" />,
       onSelect: () => {
-        // TODO: Import dialog integration
-        console.log('Open import config dialog');
+        setImportDialogOpen(true);
       }
     },
     {
@@ -93,8 +92,7 @@ export function CommandPalette() {
       type: 'action',
       icon: <Settings className="w-4 h-4" />,
       onSelect: () => {
-        // TODO: Settings page integration
-        console.log('Open settings');
+        setSettingsOpen(true);
       }
     },
     {

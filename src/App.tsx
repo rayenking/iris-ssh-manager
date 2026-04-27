@@ -8,6 +8,7 @@ import { FileBrowser } from "./components/sftp/FileBrowser";
 import { TerminalView } from "./components/terminal/TerminalView";
 import { CommandPalette } from "./components/layout/CommandPalette";
 import { SnippetManager } from "./components/snippets/SnippetManager";
+import { ImportDialog } from "./components/connections/ImportDialog";
 import { useUiStore } from "./stores/uiStore";
 import { useTerminalStore } from "./stores/terminalStore";
 import { useSettingsStore } from "./stores/settingsStore";
@@ -16,7 +17,7 @@ import { initGlobalKeybindings } from "./lib/keybindings";
 import type { Connection } from "./types/connection";
 
 function App() {
-  const { currentTheme, snippetsOpen, toggleSnippets } = useUiStore();
+  const { currentTheme, snippetsOpen, toggleSnippets, importDialogOpen, setImportDialogOpen, settingsOpen, setSettingsOpen } = useUiStore();
   const { tabs, activeTabId } = useTerminalStore();
   const { loadSettings, keybindings } = useSettingsStore();
   const [editingConnection, setEditingConnection] = useState<Connection | null | undefined>(undefined);
@@ -74,7 +75,8 @@ function App() {
                   <TerminalView connectionId={tab.connectionId} tabId={tab.id} />
                 ) : (() => {
                   const terminalTab = tabs.find(
-                    (candidate) => candidate.kind === 'terminal' && candidate.id === tab.terminalTabId,
+                    (candidate): candidate is Extract<(typeof tabs)[number], { kind: 'terminal' }> =>
+                      candidate.kind === 'terminal' && candidate.id === tab.terminalTabId,
                   );
 
                   if (!terminalTab?.sessionId) {
@@ -104,6 +106,25 @@ function App() {
         <StatusBar />
       </div>
       
+      <ImportDialog isOpen={importDialogOpen} onClose={() => setImportDialogOpen(false)} />
+      {settingsOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-[var(--color-bg-primary)] p-6 rounded-lg border border-[var(--color-border)] shadow-xl max-w-md w-full">
+            <h2 className="text-xl font-medium text-[var(--color-text-primary)] mb-4">Settings</h2>
+            <p className="text-[var(--color-text-muted)] mb-6 text-sm">
+              The full settings page will be implemented in Task 13.
+            </p>
+            <div className="flex justify-end">
+              <button 
+                className="px-4 py-2 bg-[var(--color-accent)] text-white rounded text-sm font-medium hover:bg-[var(--color-accent)]/90 transition-colors" 
+                onClick={() => setSettingsOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <ErrorToast />
       <CommandPalette />
       
