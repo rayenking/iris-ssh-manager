@@ -61,6 +61,10 @@ jobs:
       - name: Build Tauri app
         run: npx tauri build
 
+      - name: Build AppImage (Linux only)
+        if: matrix.target == 'linux'
+        run: npx tauri build -b appimage
+
       - name: Upload Linux artifacts
         if: matrix.target == 'linux'
         uses: actions/upload-artifact@v4
