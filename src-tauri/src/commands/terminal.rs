@@ -42,6 +42,13 @@ pub async fn ssh_connect(
     session.start_reading(on_data).map_err(|error| error.to_string())?;
 
     let session_id = pool.0.add(session).await;
+    if let Some(stored_session) = pool.0.get(&session_id).await {
+        stored_session
+            .lock()
+            .await
+            .set_session_id(session_id.to_string())
+            .await;
+    }
     Ok(session_id.to_string())
 }
 

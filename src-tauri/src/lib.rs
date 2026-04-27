@@ -45,12 +45,29 @@ pub fn run() {
             commands::terminal::ssh_disconnect,
             commands::terminal::ssh_write,
             commands::terminal::ssh_resize,
+            commands::tunnel::create_tunnel,
+            commands::tunnel::stop_tunnel,
+            commands::tunnel::list_tunnels,
+            commands::sftp::sftp_list_dir,
+            commands::sftp::sftp_download,
+            commands::sftp::sftp_upload,
+            commands::sftp::sftp_mkdir,
+            commands::sftp::sftp_delete,
+            commands::sftp::sftp_rename,
+            commands::sftp::local_list_dir,
             commands::config::parse_ssh_config,
             commands::config::import_ssh_config,
             commands::keychain::store_credential,
             commands::keychain::retrieve_credential,
             commands::keychain::delete_credential,
-            commands::keychain::has_credential
+            commands::keychain::has_credential,
+            commands::snippets::list_snippets,
+            commands::snippets::create_snippet,
+            commands::snippets::update_snippet,
+            commands::snippets::delete_snippet,
+            commands::settings::get_setting,
+            commands::settings::set_setting,
+            commands::settings::get_all_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

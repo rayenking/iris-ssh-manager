@@ -11,18 +11,20 @@ use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 
 use super::auth::{authenticate, AuthMethod};
+use super::tunnel::{TunnelManager, forwarded_channel_sender};
 
 const READ_BATCH_LIMIT: usize = 8 * 1024;
 
 #[derive(Default)]
-struct SharedHandlerState {
+pub(crate) struct SharedHandlerState {
     shell_channel_id: Option<ChannelId>,
     output_tx: Option<mpsc::UnboundedSender<Vec<u8>>>,
+    forwarded_channel_tx: Option<mpsc::UnboundedSender<super::tunnel::IncomingForwardedChannel>>,
 }
 
 #[derive(Clone, Default)]
 pub(crate) struct SshHandler {
-    shared: Arc<Mutex<SharedHandlerState>>,
+    pub(crate) shared: Arc<Mutex<SharedHandlerState>>,
 }
 
 #[async_trait]
@@ -56,6 +58,19 @@ impl client::Handler for SshHandler {
         self.forward_data(channel, data).await;
         Ok(())
     }
+
+    async fn server_channel_open_forwarded_tcpip(
+        &mut self,
+        channel: Channel<client::Msg>,
+        _connected_address: &str,
+        connected_port: u32,
+        _originator_address: &str,
+        _originator_port: u32,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        self.forward_remote_channel(channel, connected_port as u16).await;
+        Ok(())
+    }
 }
 
 impl SshHandler {
@@ -72,14 +87,21 @@ impl SshHandler {
             let _ = sender.send(data.to_vec());
         }
     }
+
+    pub(crate) async fn forwarded_channel_sender(
+        &self,
+    ) -> Option<mpsc::UnboundedSender<super::tunnel::IncomingForwardedChannel>> {
+        self.shared.lock().await.forwarded_channel_tx.clone()
+    }
 }
 
 pub struct SshSession {
-    pub(crate) handle: Option<client::Handle<SshHandler>>,
+    pub(crate) handle: Option<Arc<Mutex<client::Handle<SshHandler>>>>,
     shell_channel: Option<Channel<client::Msg>>,
     handler_state: Arc<Mutex<SharedHandlerState>>,
     output_rx: Option<mpsc::UnboundedReceiver<Vec<u8>>>,
     read_task: Option<JoinHandle<()>>,
+    tunnel_manager: Arc<TunnelManager>,
     pub host: String,
     pub port: u16,
     pub username: String,
@@ -100,7 +122,12 @@ impl SshSession {
         let handler = SshHandler::default();
         let handler_state = handler.shared.clone();
         let (output_tx, output_rx) = mpsc::unbounded_channel();
-        handler_state.lock().await.output_tx = Some(output_tx);
+        let (forwarded_channel_tx, forwarded_channel_rx) = forwarded_channel_sender();
+        {
+            let mut state = handler_state.lock().await;
+            state.output_tx = Some(output_tx);
+            state.forwarded_channel_tx = Some(forwarded_channel_tx);
+        }
 
         let mut handle = client::connect(config, (host, port), handler)
             .await
@@ -111,12 +138,16 @@ impl SshSession {
             return Err(anyhow!("SSH authentication was rejected by the server"));
         }
 
+        let handle = Arc::new(Mutex::new(handle));
+        let tunnel_manager = Arc::new(TunnelManager::new(Arc::clone(&handle), forwarded_channel_rx));
+
         Ok(Self {
             handle: Some(handle),
             shell_channel: None,
             handler_state,
             output_rx: Some(output_rx),
             read_task: None,
+            tunnel_manager,
             host: host.to_string(),
             port,
             username: username.to_string(),
@@ -128,12 +159,16 @@ impl SshSession {
             return Ok(());
         }
 
-        let handle = self
+        let handle = Arc::clone(
+            self
             .handle
             .as_ref()
-            .ok_or_else(|| anyhow!("SSH session handle is not available"))?;
+            .ok_or_else(|| anyhow!("SSH session handle is not available"))?,
+        );
 
         let channel = handle
+            .lock()
+            .await
             .channel_open_session()
             .await
             .context("failed to open SSH session channel")?;
@@ -219,20 +254,36 @@ impl SshSession {
             .map_err(Into::into)
     }
 
+    pub fn tunnel_manager(&self) -> Arc<TunnelManager> {
+        Arc::clone(&self.tunnel_manager)
+    }
+
+    pub async fn set_session_id(&self, session_id: String) {
+        self.tunnel_manager.set_session_id(session_id).await;
+    }
+
     pub async fn disconnect(&mut self) -> Result<()> {
         if let Some(task) = self.read_task.take() {
             task.abort();
         }
+
+        self.tunnel_manager.stop_all().await;
 
         if let Some(channel) = self.shell_channel.take() {
             let _ = channel.eof().await;
             let _ = channel.close().await;
         }
 
-        self.handler_state.lock().await.shell_channel_id = None;
+        {
+            let mut state = self.handler_state.lock().await;
+            state.shell_channel_id = None;
+            state.forwarded_channel_tx = None;
+        }
 
         if let Some(handle) = self.handle.take() {
             handle
+                .lock()
+                .await
                 .disconnect(Disconnect::ByApplication, "disconnect", "en-US")
                 .await
                 .context("failed to disconnect SSH session")?;
@@ -249,7 +300,13 @@ impl Drop for SshSession {
             task.abort();
         }
 
-        self.handler_state.blocking_lock().shell_channel_id = None;
+        {
+            let mut state = self.handler_state.blocking_lock();
+            state.shell_channel_id = None;
+            state.forwarded_channel_tx = None;
+        }
+
+        self.tunnel_manager.stop_all_blocking();
 
         let shell_channel = self.shell_channel.take();
         let handle = self.handle.take();
@@ -266,6 +323,8 @@ impl Drop for SshSession {
 
             if let Some(handle) = handle {
                 let _ = handle
+                    .lock()
+                    .await
                     .disconnect(Disconnect::ByApplication, "drop", "en-US")
                     .await;
             }

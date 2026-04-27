@@ -1,11 +1,11 @@
-import { Search, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Plus, ChevronLeft, ChevronRight, Code } from 'lucide-react';
 import { useUiStore } from '../../stores/uiStore';
 import { useConnectionStore } from '../../stores/connectionStore';
 import { ConnectionList } from '../connections/ConnectionList';
 import { QuickConnect } from '../connections/QuickConnect';
 
 export function Sidebar() {
-  const { sidebarCollapsed, toggleSidebar } = useUiStore();
+  const { sidebarCollapsed, toggleSidebar, toggleSnippets } = useUiStore();
   const { searchQuery, setSearchQuery } = useConnectionStore();
 
   const handleNewConnection = () => {
@@ -43,39 +43,66 @@ export function Sidebar() {
         {!sidebarCollapsed && <ConnectionList />}
       </div>
 
-      <div className="p-2 border-t border-[var(--color-border)] flex items-center justify-between shrink-0">
-        {!sidebarCollapsed ? (
-          <>
+      <div className="p-2 border-t border-[var(--color-border)] flex flex-col gap-2 shrink-0">
+        <div className="flex items-center justify-between">
+          {!sidebarCollapsed ? (
+            <>
+              <button 
+                onClick={handleNewConnection}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors flex-1"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Connection</span>
+              </button>
+            </>
+          ) : (
             <button 
               onClick={handleNewConnection}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Connection</span>
-            </button>
-            <button 
-              onClick={toggleSidebar}
-              className="p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-          </>
-        ) : (
-          <div className="flex flex-col gap-2 w-full items-center">
-            <button 
-              onClick={handleNewConnection}
-              className="p-1.5 text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors"
+              className="p-1.5 text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors w-full flex justify-center"
+              title="New Connection"
             >
               <Plus className="w-4 h-4" />
             </button>
-            <button 
-              onClick={toggleSidebar}
-              className="p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+          )}
+        </div>
+
+        <div className="flex items-center justify-between">
+          {!sidebarCollapsed ? (
+            <>
+              <button 
+                onClick={toggleSnippets}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors flex-1"
+              >
+                <Code className="w-4 h-4" />
+                <span>Snippets</span>
+              </button>
+              <button 
+                onClick={toggleSidebar}
+                className="p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors"
+                title="Collapse Sidebar"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <div className="flex flex-col gap-2 w-full items-center">
+              <button 
+                onClick={toggleSnippets}
+                className="p-1.5 text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors w-full flex justify-center"
+                title="Snippets"
+              >
+                <Code className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={toggleSidebar}
+                className="p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors w-full flex justify-center"
+                title="Expand Sidebar"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

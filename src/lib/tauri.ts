@@ -8,6 +8,8 @@ import type {
   UpdateGroupInput,
   ParsedSshHost
 } from '../types/connection';
+import type { Snippet, CreateSnippetInput, UpdateSnippetInput } from '../types/snippet';
+import type { Tunnel, TunnelConfig } from '../types/tunnel';
 
 export const tauriApi = {
   listConnections: (): Promise<Connection[]> => 
@@ -72,4 +74,36 @@ export const tauriApi = {
 
   sshResize: (sessionId: string, cols: number, rows: number): Promise<void> =>
     invoke('ssh_resize', { sessionId, cols, rows }),
+
+  createTunnel: (sessionId: string, config: TunnelConfig): Promise<string> =>
+    invoke('create_tunnel', { sessionId, config }),
+
+  stopTunnel: (tunnelId: string): Promise<void> =>
+    invoke('stop_tunnel', { tunnelId }),
+
+  listTunnels: (sessionId: string): Promise<Tunnel[]> =>
+    invoke('list_tunnels', { sessionId }),
+
+  // Snippets
+  listSnippets: (): Promise<Snippet[]> =>
+    invoke('list_snippets'),
+
+  createSnippet: (data: CreateSnippetInput): Promise<Snippet> =>
+    invoke('create_snippet', { data }),
+
+  updateSnippet: (id: string, data: UpdateSnippetInput): Promise<Snippet> =>
+    invoke('update_snippet', { id, data }),
+
+  deleteSnippet: (id: string): Promise<void> =>
+    invoke('delete_snippet', { id }),
+
+  // Settings
+  getSetting: (key: string): Promise<string | null> =>
+    invoke('get_setting', { key }),
+
+  setSetting: (key: string, value: string): Promise<void> =>
+    invoke('set_setting', { key, value }),
+
+  getAllSettings: (): Promise<Record<string, string>> =>
+    invoke('get_all_settings'),
 };

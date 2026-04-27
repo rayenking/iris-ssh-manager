@@ -5,20 +5,33 @@ import { StatusBar } from "./components/layout/StatusBar";
 import { ErrorToast } from "./components/layout/ErrorToast";
 import { ConnectionForm } from "./components/connections/ConnectionForm";
 import { TerminalView } from "./components/terminal/TerminalView";
+import { CommandPalette } from "./components/layout/CommandPalette";
+import { SnippetManager } from "./components/snippets/SnippetManager";
 import { useUiStore } from "./stores/uiStore";
 import { useTerminalStore } from "./stores/terminalStore";
+import { useSettingsStore } from "./stores/settingsStore";
 import { applyTheme } from "./lib/themes";
+import { initGlobalKeybindings } from "./lib/keybindings";
 import type { Connection } from "./types/connection";
 
 function App() {
-  const { currentTheme } = useUiStore();
+  const { currentTheme, snippetsOpen, toggleSnippets } = useUiStore();
   const { tabs, activeTabId } = useTerminalStore();
+  const { loadSettings, keybindings } = useSettingsStore();
   const [editingConnection, setEditingConnection] = useState<Connection | null | undefined>(undefined);
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
 
   useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
+
+  useEffect(() => {
     applyTheme(currentTheme);
   }, [currentTheme]);
+
+  useEffect(() => {
+    initGlobalKeybindings(keybindings);
+  }, [keybindings]);
 
   useEffect(() => {
     const handleOpen = (e: CustomEvent) => setEditingConnection(e.detail?.connection || null);
@@ -34,6 +47,19 @@ function App() {
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] font-sans antialiased">
       <Sidebar />
+      
+      {snippetsOpen && (
+        <div className="w-[300px] border-r border-[var(--color-border)] z-10 flex flex-col bg-[var(--color-bg-secondary)] relative">
+          <button 
+            onClick={toggleSnippets}
+            className="absolute top-4 right-4 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+          >
+            &times;
+          </button>
+          <SnippetManager />
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col h-full min-w-0">
         <TabBar />
         {activeTab ? (
@@ -54,12 +80,16 @@ function App() {
                 Welcome to Iris
               </h1>
               <p className="text-sm">Select a connection to start</p>
+              <p className="text-xs opacity-50 mt-4">Press Ctrl+K or Cmd+K for command palette</p>
             </div>
           </div>
         )}
         <StatusBar />
       </div>
+      
       <ErrorToast />
+      <CommandPalette />
+      
       {editingConnection !== undefined && (
         <ConnectionForm 
           connection={editingConnection} 

@@ -32,4 +32,5 @@ uuid = { version = "1", features = ["v4"] }
 thiserror = "2"
 anyhow = "1"
 dirs = "6"
+chrono = { version = "0.4", features = ["clock", "std"] }
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
