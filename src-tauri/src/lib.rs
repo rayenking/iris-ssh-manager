@@ -9,12 +9,16 @@ pub mod ssh;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let app_data_dir = app
                 .path()
                 .app_data_dir()
                 .map_err(|error| error.to_string())?;
             let db_connection = db::init_db(&app_data_dir).map_err(|error| error.to_string())?;
+
+            keychain::init_keychain()?;
 
             app.manage(db::DbState(std::sync::Mutex::new(db_connection)));
             app.manage(ssh::pool::SshPool(ssh::ConnectionPool::new()));

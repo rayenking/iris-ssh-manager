@@ -4,6 +4,8 @@
   "description": "Default capabilities for Iris SSH Manager",
   "windows": ["main"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "shell:allow-open",
+    "opener:default"
   ]
 }

@@ -23,6 +23,8 @@ serde = { version = "1", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2", features = [] }
 tauri-plugin-log = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-opener = "2"
 async-trait = "0.1"
 russh = "0.48"
 russh-sftp = "2.0.0-beta.5"
@@ -33,4 +35,13 @@ thiserror = "2"
 anyhow = "1"
 dirs = "6"
 chrono = { version = "0.4", features = ["clock", "std"] }
-keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+keyring-core = "0.7"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+apple-native-keyring-store = "0.1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-native-keyring-store = "0.1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+dbus-secret-service-keyring-store = { version = "0.1", features = ["crypto-rust"] }
