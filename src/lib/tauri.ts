@@ -10,6 +10,7 @@ import type {
 } from '../types/connection';
 import type { Snippet, CreateSnippetInput, UpdateSnippetInput } from '../types/snippet';
 import type { Tunnel, TunnelConfig } from '../types/tunnel';
+import type { FileEntry, TransferProgress } from '../types/sftp';
 
 export const tauriApi = {
   listConnections: (): Promise<Connection[]> => 
@@ -74,6 +75,35 @@ export const tauriApi = {
 
   sshResize: (sessionId: string, cols: number, rows: number): Promise<void> =>
     invoke('ssh_resize', { sessionId, cols, rows }),
+
+  sftpListDir: (sessionId: string, path: string): Promise<FileEntry[]> =>
+    invoke('sftp_list_dir', { sessionId, path }),
+
+  sftpDownload: (
+    sessionId: string,
+    remotePath: string,
+    localPath: string,
+    onProgress: Channel<TransferProgress>,
+  ): Promise<void> => invoke('sftp_download', { sessionId, remotePath, localPath, onProgress }),
+
+  sftpUpload: (
+    sessionId: string,
+    localPath: string,
+    remotePath: string,
+    onProgress: Channel<TransferProgress>,
+  ): Promise<void> => invoke('sftp_upload', { sessionId, localPath, remotePath, onProgress }),
+
+  sftpMkdir: (sessionId: string, path: string): Promise<void> =>
+    invoke('sftp_mkdir', { sessionId, path }),
+
+  sftpDelete: (sessionId: string, path: string): Promise<void> =>
+    invoke('sftp_delete', { sessionId, path }),
+
+  sftpRename: (sessionId: string, oldPath: string, newPath: string): Promise<void> =>
+    invoke('sftp_rename', { sessionId, old: oldPath, new: newPath }),
+
+  localListDir: (path: string): Promise<FileEntry[]> =>
+    invoke('local_list_dir', { path }),
 
   createTunnel: (sessionId: string, config: TunnelConfig): Promise<string> =>
     invoke('create_tunnel', { sessionId, config }),
