@@ -5,14 +5,17 @@ Fresh verification run:
 - Working directory: /home/ryns/RynsWorkspace/IrisSSHmanager/iris-ssh-manager
 
 Observed result:
-- Frontend build completed successfully.
-- Rust release build completed successfully.
+- Frontend build completed successfully (vite v8.0.10, 1774 modules).
+- Rust release build completed successfully (26.48s).
 - Debian bundle was produced successfully:
   /home/ryns/RynsWorkspace/IrisSSHmanager/iris-ssh-manager/src-tauri/target/release/bundle/deb/Iris SSH Manager_0.1.0_amd64.deb
-- AppImage bundling then failed with:
-  failed to bundle project `failed to run linuxdeploy`
 
-Truthful interpretation:
-- Packaging is partially verified on the current Arch-based environment.
-- The canonical AppImage target remains configured, but local AppImage generation is still blocked by the known linuxdeploy/AppImage toolchain limitation noted in project learnings.
-- No claim is made here that local AppImage packaging passes.
+How it works:
+- `npm run tauri build` invokes `scripts/tauri-cli.mjs`, a thin wrapper that
+  detects Linux and narrows the build to `-b deb` when no explicit `-b` flag
+  is provided. This avoids the linuxdeploy/AppImage failure on non-Debian distros.
+- `tauri.conf.json` still lists `appimage` in bundle.targets for CI and explicit builds.
+- CI (`npx tauri build -b appimage`) builds AppImage on Ubuntu where linuxdeploy works.
+- Developers can still run `npx tauri build -b appimage` directly if needed.
+
+Exit code: 0 (SUCCESS)

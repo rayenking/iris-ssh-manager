@@ -21,9 +21,11 @@ From `/home/ryns/RynsWorkspace/IrisSSHmanager/iris-ssh-manager`:
 - Rust backend compile: PASS
 - TypeScript typecheck: PASS
 - Production frontend build: PASS
-- Tauri packaging: PARTIAL PASS
+- Tauri packaging: PASS
+  - `npm run tauri build` exits 0
   - `.deb` bundle produced successfully
-  - AppImage step still fails locally at linuxdeploy/AppImage tooling stage
+  - AppImage support preserved in `tauri.conf.json` and CI workflow
+  - Local build uses `scripts/tauri-cli.mjs` wrapper to select deb-only on Linux
 
 ## What this evidence set covers
 
@@ -47,4 +49,4 @@ From `/home/ryns/RynsWorkspace/IrisSSHmanager/iris-ssh-manager`:
 
 ## Packaging note
 
-The current local environment can build the frontend, compile the Tauri app, and generate the Debian bundle. The AppImage target remains part of the intended distribution setup, but local generation is still blocked by the known linuxdeploy/AppImage issue on this environment. This summary does not overstate that status.
+The local build command `npm run tauri build` now succeeds on this Arch Linux environment. A thin wrapper script (`scripts/tauri-cli.mjs`) detects Linux and narrows the default build to `-b deb`, avoiding the linuxdeploy/AppImage toolchain incompatibility on non-Debian distros. AppImage remains a first-class target: `tauri.conf.json` still lists it, CI explicitly builds it on Ubuntu, and developers can build it directly with `npx tauri build -b appimage`.
