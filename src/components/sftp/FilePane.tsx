@@ -205,7 +205,7 @@ function joinPath(basePath: string, name: string) {
 }
 
 function normalizePath(path: string) {
-  return path.replace(/\/g, '\\');
+  return path.replace(/\\/g, '\\');
 }
 
 function formatBytes(bytes: number) {
