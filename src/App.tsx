@@ -5,12 +5,13 @@ import { StatusBar } from "./components/layout/StatusBar";
 import { ErrorToast } from "./components/layout/ErrorToast";
 import { ConnectionForm } from "./components/connections/ConnectionForm";
 import { FileBrowser } from "./components/sftp/FileBrowser";
-import { TerminalView } from "./components/terminal/TerminalView";
+import { SplitContainer } from "./components/terminal/SplitContainer";
 import { CommandPalette } from "./components/layout/CommandPalette";
 import { SnippetManager } from "./components/snippets/SnippetManager";
 import { ImportDialog } from "./components/connections/ImportDialog";
 import { useUiStore } from "./stores/uiStore";
 import { useTerminalStore } from "./stores/terminalStore";
+import { useSplitStore } from "./stores/splitStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { applyTheme } from "./lib/themes";
 import { initGlobalKeybindings, registerShortcut, unregisterShortcut } from "./lib/keybindings";
@@ -20,6 +21,7 @@ import { SettingsPage } from "./components/settings/SettingsPage";
 function App() {
   const { currentTheme, snippetsOpen, toggleSnippets, importDialogOpen, setImportDialogOpen, settingsOpen, toggleCommandPalette, setSidebarCollapsed } = useUiStore();
   const { tabs, activeTabId } = useTerminalStore();
+  const splitTrees = useSplitStore((state) => state.splitTrees);
   const { loadSettings, keybindings, sidebarDefaultState, theme } = useSettingsStore();
   const [editingConnection, setEditingConnection] = useState<Connection | null | undefined>(undefined);
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
@@ -154,7 +156,7 @@ function App() {
                 className={`absolute inset-0 flex flex-col ${activeTabId === tab.id ? '' : 'hidden'}`}
               >
                 {tab.kind === 'terminal' ? (
-                  <TerminalView connectionId={tab.connectionId} tabId={tab.id} />
+                  splitTrees[tab.id] ? <SplitContainer node={splitTrees[tab.id]} tabId={tab.id} /> : null
                 ) : (() => {
                   const terminalTab = tabs.find(
                     (candidate): candidate is Extract<(typeof tabs)[number], { kind: 'terminal' }> =>
