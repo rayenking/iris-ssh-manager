@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { TerminalTab } from '../types/terminal';
+import type { TabStatus } from '../types/terminal';
 
 interface TerminalState {
   tabs: TerminalTab[];
@@ -9,6 +10,8 @@ interface TerminalState {
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
+  updateTabStatus: (id: string, status: TabStatus) => void;
+  setTabSessionId: (id: string, sessionId?: string) => void;
 }
 
 export const useTerminalStore = create<TerminalState>((set) => ({
@@ -20,7 +23,7 @@ export const useTerminalStore = create<TerminalState>((set) => ({
       id: crypto.randomUUID(),
       connectionId,
       title,
-      status: 'connecting'
+      status: 'connecting',
     };
 
     set((state) => ({
@@ -46,6 +49,18 @@ export const useTerminalStore = create<TerminalState>((set) => ({
   },
 
   setActiveTab: (id) => set({ activeTabId: id }),
+
+  updateTabStatus: (id, status) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) => (tab.id === id ? { ...tab, status } : tab)),
+    }));
+  },
+
+  setTabSessionId: (id, sessionId) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) => (tab.id === id ? { ...tab, sessionId } : tab)),
+    }));
+  },
 
   reorderTabs: (fromIndex, toIndex) => {
     set((state) => {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronRight, ChevronDown, Folder } from 'lucide-react';
-import { ConnectionGroup } from '../../types/connection';
+import type { ConnectionGroup } from '../../types/connection';
 
 interface Props {
   group: ConnectionGroup;

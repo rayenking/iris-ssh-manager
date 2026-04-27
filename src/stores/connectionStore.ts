@@ -21,7 +21,7 @@ interface ConnectionState {
   deleteGroup: (id: string) => Promise<void>;
 }
 
-export const useConnectionStore = create<ConnectionState>((set, get) => ({
+export const useConnectionStore = create<ConnectionState>((set) => ({
   connections: [],
   groups: [],
   selectedId: null,

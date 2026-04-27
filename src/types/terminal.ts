@@ -5,4 +5,5 @@ export interface TerminalTab {
   connectionId: string;
   title: string;
   status: TabStatus;
+  sessionId?: string;
 }

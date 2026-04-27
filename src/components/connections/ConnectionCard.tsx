@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Connection } from '../../types/connection';
+import type { Connection } from '../../types/connection';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useConnectionStore } from '../../stores/connectionStore';
 import { tauriApi } from '../../lib/tauri';

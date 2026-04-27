@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { Channel, invoke } from '@tauri-apps/api/core';
 import type { 
   Connection, 
   ConnectionGroup, 
@@ -60,4 +60,16 @@ export const tauriApi = {
 
   hasCredential: (connectionId: string): Promise<boolean> =>
     invoke('has_credential', { connectionId }),
+
+  sshConnect: (connectionId: string, onData: Channel<number[]>): Promise<string> =>
+    invoke('ssh_connect', { connectionId, onData }),
+
+  sshDisconnect: (sessionId: string): Promise<void> =>
+    invoke('ssh_disconnect', { sessionId }),
+
+  sshWrite: (sessionId: string, data: number[]): Promise<void> =>
+    invoke('ssh_write', { sessionId, data }),
+
+  sshResize: (sessionId: string, cols: number, rows: number): Promise<void> =>
+    invoke('ssh_resize', { sessionId, cols, rows }),
 };

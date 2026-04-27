@@ -1,4 +1,5 @@
-import { useState, KeyboardEvent } from 'react';
+import { useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { Zap } from 'lucide-react';
 import { useConnectionStore } from '../../stores/connectionStore';
 import { useTerminalStore } from '../../stores/terminalStore';

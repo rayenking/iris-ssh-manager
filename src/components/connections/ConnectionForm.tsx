@@ -1,6 +1,7 @@
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import type { FormEvent } from 'react';
 import { X, ShieldCheck } from 'lucide-react';
-import { Connection, AuthMethod, CreateConnectionInput, UpdateConnectionInput } from '../../types/connection';
+import type { Connection, AuthMethod, CreateConnectionInput, UpdateConnectionInput } from '../../types/connection';
 import { useConnectionStore } from '../../stores/connectionStore';
 import { tauriApi } from '../../lib/tauri';
 

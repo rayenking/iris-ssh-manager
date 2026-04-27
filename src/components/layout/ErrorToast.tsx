@@ -1,4 +1,4 @@
-import { useUiStore } from '../stores/uiStore';
+import { useUiStore } from '../../stores/uiStore';
 import { X, AlertCircle } from 'lucide-react';
 
 export function ErrorToast() {
