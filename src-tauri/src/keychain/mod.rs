@@ -1,6 +1,30 @@
-use keyring::Entry;
+use keyring_core::Entry;
 
 const SERVICE_NAME: &str = "iris-ssh-manager";
+
+/// Initialize the platform-specific credential store.
+/// Must be called once at app startup before any keychain operations.
+pub fn init_keychain() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let store = apple_native_keyring_store::keychain::Store::new()
+            .map_err(|e| format!("Failed to initialize keychain: {e}"))?;
+        keyring_core::set_default_store(store);
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let store = windows_native_keyring_store::Store::new()
+            .map_err(|e| format!("Failed to initialize keychain: {e}"))?;
+        keyring_core::set_default_store(store);
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let store = dbus_secret_service_keyring_store::Store::new()
+            .map_err(|e| format!("Failed to initialize keychain: {e}"))?;
+        keyring_core::set_default_store(store);
+    }
+    Ok(())
+}
 
 pub fn store_credential(connection_id: &str, secret: &str) -> Result<(), String> {
     let entry = Entry::new(SERVICE_NAME, connection_id).map_err(|e| e.to_string())?;
@@ -11,7 +35,7 @@ pub fn retrieve_credential(connection_id: &str) -> Result<Option<String>, String
     let entry = Entry::new(SERVICE_NAME, connection_id).map_err(|e| e.to_string())?;
     match entry.get_password() {
         Ok(password) => Ok(Some(password)),
-        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(keyring_core::Error::NoEntry) => Ok(None),
         Err(e) => Err(e.to_string()),
     }
 }
@@ -20,7 +44,7 @@ pub fn delete_credential(connection_id: &str) -> Result<(), String> {
     let entry = Entry::new(SERVICE_NAME, connection_id).map_err(|e| e.to_string())?;
     match entry.delete_credential() {
         Ok(()) => Ok(()),
-        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(keyring_core::Error::NoEntry) => Ok(()),
         Err(e) => Err(e.to_string()),
     }
 }

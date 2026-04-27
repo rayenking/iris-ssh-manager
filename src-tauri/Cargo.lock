@@ -133,7 +133,7 @@ dependencies = [
  "chrono",
  "dbus-secret-service-keyring-store",
  "dirs",
- "keyring-core 0.7.4",
+ "keyring-core",
  "log",
  "rusqlite",
  "russh",
@@ -153,13 +153,13 @@ dependencies = [
 
 [[package]]
 name = "apple-native-keyring-store"
-version = "0.1.0"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db588f4733b67866064b67a48138ebaada5d25c258e9d60cc47f01a0e26c31b7"
+checksum = "a7be2f067ccd8d4b4d4a66ddafe0f32a5dff31732f32dbff85fefc40929b1f72"
 dependencies = [
- "keyring-core 0.5.0",
+ "keyring-core",
+ "log",
  "security-framework",
- "security-framework-sys",
 ]
 
 [[package]]
@@ -1047,12 +1047,12 @@ dependencies = [
 
 [[package]]
 name = "dbus-secret-service-keyring-store"
-version = "0.1.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b49b888e2a641a5d01947f8f57e062580acc2c7f567accdc1b623e13e5130d2"
+checksum = "21d8f54da401bb5eb2a4d873ac4b359f4a599df2ca8634bb5b8c045e5ee78757"
 dependencies = [
  "dbus-secret-service",
- "keyring-core 0.5.0",
+ "keyring-core",
 ]
 
 [[package]]
@@ -2581,18 +2581,9 @@ dependencies = [
 
 [[package]]
 name = "keyring-core"
-version = "0.5.0"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4334ce6f52997b27cdf93ff93e9b7dc585ddcb377006154fb2f6a695c40c53d6"
-dependencies = [
- "log",
-]
-
-[[package]]
-name = "keyring-core"
-version = "0.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d8286c3ab222af2fa9e57874fe419893d967f739c7bf1743f98a88678edbf08"
+checksum = "fb1e621458ca9c51aa110bd0339d4751a056b9576bf1253aee1aa560dda0fc9d"
 dependencies = [
  "log",
 ]
@@ -6419,13 +6410,14 @@ checksum = "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5"
 
 [[package]]
 name = "windows-native-keyring-store"
-version = "0.1.0"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "317fe623aabeb67748729bc265efe8832873486f6429b49254af7c12f7468cc8"
+checksum = "b5fd986f648459dd29aa252ed3a5ad11a60c0b1251bf81625fb03a86c69d274e"
 dependencies = [
  "byteorder",
- "keyring-core 0.5.0",
- "windows-sys 0.60.2",
+ "keyring-core",
+ "regex",
+ "windows-sys 0.61.2",
  "zeroize",
 ]
 
