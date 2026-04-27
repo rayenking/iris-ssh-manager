@@ -7,6 +7,7 @@ import { Terminal } from '@xterm/xterm';
 import { useEffect, useRef } from 'react';
 import { useSSH } from '../../hooks/useSSH';
 import { useTerminalStore } from '../../stores/terminalStore';
+import { TunnelManager } from '../tunnels/TunnelManager';
 
 interface Props {
   connectionId: string;
@@ -200,7 +201,8 @@ export function TerminalView({ connectionId, tabId }: Props) {
 
   return (
     <div ref={containerRef} className="relative flex h-full min-h-0 flex-1 bg-[var(--color-bg-primary)]">
-      <div ref={terminalHostRef} className="h-full w-full px-4 py-3" />
+      <div ref={terminalHostRef} className="h-full min-w-0 flex-1 px-4 py-3" />
+      <TunnelManager sessionId={sessionIdRef.current} />
 
       {connectionState === 'connecting' && (
         <div className="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-bg-primary)_82%,transparent)]">
