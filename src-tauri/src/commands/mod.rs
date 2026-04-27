@@ -1,1 +1,2 @@
-// Tauri command handlers
+pub mod connection;
+pub mod terminal;
