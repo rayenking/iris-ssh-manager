@@ -11,6 +11,10 @@ const defaultRegistry: KeybindingRegistry = {
   'command-palette': { combo: 'Ctrl+k' },
   'new-connection': { combo: 'Ctrl+n' },
   'close-tab': { combo: 'Ctrl+w' },
+  'open-settings': { combo: 'Ctrl+,' },
+  'toggle-snippets': { combo: 'Ctrl+Shift+s' },
+  'open-import-config': { combo: 'Ctrl+Shift+i' },
+  'open-sftp': { combo: 'Ctrl+Shift+o' },
 };
 
 const registry: KeybindingRegistry = {

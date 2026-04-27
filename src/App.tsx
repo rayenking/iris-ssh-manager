@@ -46,6 +46,52 @@ function App() {
   }, [toggleCommandPalette]);
 
   useEffect(() => {
+    const handleOpenSettings = () => {
+      useUiStore.getState().setSettingsOpen(true);
+    };
+
+    registerShortcut('open-settings', handleOpenSettings);
+
+    return () => unregisterShortcut('open-settings');
+  }, []);
+
+  useEffect(() => {
+    registerShortcut('toggle-snippets', toggleSnippets);
+
+    return () => unregisterShortcut('toggle-snippets');
+  }, [toggleSnippets]);
+
+  useEffect(() => {
+    const handleOpenImportConfig = () => {
+      useUiStore.getState().setImportDialogOpen(true);
+    };
+
+    registerShortcut('open-import-config', handleOpenImportConfig);
+
+    return () => unregisterShortcut('open-import-config');
+  }, []);
+
+  useEffect(() => {
+    const handleOpenSftp = () => {
+      const { activeTabId, tabs, openFileBrowserTab } = useTerminalStore.getState();
+      const activeTerminalTab = tabs.find(
+        (tab): tab is Extract<(typeof tabs)[number], { kind: 'terminal' }> =>
+          tab.kind === 'terminal' && tab.id === activeTabId,
+      );
+
+      if (!activeTerminalTab?.sessionId) {
+        return;
+      }
+
+      openFileBrowserTab(activeTerminalTab.id, activeTerminalTab.connectionId, activeTerminalTab.title);
+    };
+
+    registerShortcut('open-sftp', handleOpenSftp);
+
+    return () => unregisterShortcut('open-sftp');
+  }, []);
+
+  useEffect(() => {
     const handleNewConnection = () => {
       window.dispatchEvent(new CustomEvent('open-connection-form', { detail: { connection: null } }));
     };
