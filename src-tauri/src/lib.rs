@@ -18,7 +18,9 @@ pub fn run() {
                 .map_err(|error| error.to_string())?;
             let db_connection = db::init_db(&app_data_dir).map_err(|error| error.to_string())?;
 
-            keychain::init_keychain()?;
+            if let Err(e) = keychain::init_keychain() {
+                log::warn!("Keychain unavailable, credential storage will not work: {e}");
+            }
 
             app.manage(db::DbState(std::sync::Mutex::new(db_connection)));
             app.manage(ssh::pool::SshPool(ssh::ConnectionPool::new()));
