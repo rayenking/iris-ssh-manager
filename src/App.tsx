@@ -46,6 +46,32 @@ function App() {
   }, [toggleCommandPalette]);
 
   useEffect(() => {
+    const handleNewConnection = () => {
+      window.dispatchEvent(new CustomEvent('open-connection-form', { detail: { connection: null } }));
+    };
+
+    registerShortcut('new-connection', handleNewConnection);
+
+    return () => unregisterShortcut('new-connection');
+  }, []);
+
+  useEffect(() => {
+    const handleCloseTab = () => {
+      const { activeTabId, closeTab } = useTerminalStore.getState();
+
+      if (!activeTabId) {
+        return;
+      }
+
+      closeTab(activeTabId);
+    };
+
+    registerShortcut('close-tab', handleCloseTab);
+
+    return () => unregisterShortcut('close-tab');
+  }, []);
+
+  useEffect(() => {
     const handleOpen = (e: CustomEvent) => setEditingConnection(e.detail?.connection || null);
     const handleClose = () => setEditingConnection(undefined);
     window.addEventListener('open-connection-form', handleOpen as EventListener);
