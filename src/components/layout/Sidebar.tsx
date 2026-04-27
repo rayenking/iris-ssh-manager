@@ -1,11 +1,11 @@
-import { Search, Plus, ChevronLeft, ChevronRight, Code } from 'lucide-react';
+import { Search, Plus, ChevronLeft, ChevronRight, Code, Settings } from 'lucide-react';
 import { useUiStore } from '../../stores/uiStore';
 import { useConnectionStore } from '../../stores/connectionStore';
 import { ConnectionList } from '../connections/ConnectionList';
 import { QuickConnect } from '../connections/QuickConnect';
 
 export function Sidebar() {
-  const { sidebarCollapsed, toggleSidebar, toggleSnippets } = useUiStore();
+  const { sidebarCollapsed, toggleSidebar, toggleSnippets, setSettingsOpen } = useUiStore();
   const { searchQuery, setSearchQuery } = useConnectionStore();
 
   const handleNewConnection = () => {
@@ -94,6 +94,13 @@ export function Sidebar() {
                 <Code className="w-4 h-4" />
               </button>
               <button 
+                onClick={() => setSettingsOpen(true)}
+                className="p-1.5 text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors w-full flex justify-center"
+                title="Settings"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+              <button 
                 onClick={toggleSidebar}
                 className="p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors w-full flex justify-center"
                 title="Expand Sidebar"
@@ -103,6 +110,17 @@ export function Sidebar() {
             </div>
           )}
         </div>
+
+        {!sidebarCollapsed && (
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors w-full"
+            type="button"
+          >
+            <Settings className="w-4 h-4" />
+            <span>Settings</span>
+          </button>
+        )}
       </div>
     </div>
   );

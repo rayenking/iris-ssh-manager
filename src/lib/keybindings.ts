@@ -7,10 +7,14 @@ interface KeybindingRegistry {
   };
 }
 
-const registry: KeybindingRegistry = {
+const defaultRegistry: KeybindingRegistry = {
   'command-palette': { combo: 'Ctrl+k' },
   'new-connection': { combo: 'Ctrl+n' },
   'close-tab': { combo: 'Ctrl+w' },
+};
+
+const registry: KeybindingRegistry = {
+  ...defaultRegistry,
 };
 
 const handlers = new Map<string, KeybindingHandler>();
@@ -33,10 +37,38 @@ export function updateShortcutCombo(action: string, combo: string) {
 
 export function getDefaultBindings(): Record<string, string> {
   const bindings: Record<string, string> = {};
+  for (const [action, data] of Object.entries(defaultRegistry)) {
+    bindings[action] = data.combo;
+  }
+  return bindings;
+}
+
+export function getCurrentBindings(): Record<string, string> {
+  const bindings: Record<string, string> = {};
   for (const [action, data] of Object.entries(registry)) {
     bindings[action] = data.combo;
   }
   return bindings;
+}
+
+export function getRegisteredActions(): string[] {
+  return Object.keys(defaultRegistry);
+}
+
+export function resetShortcutCombo(action: string) {
+  const combo = defaultRegistry[action]?.combo;
+
+  if (!combo) {
+    return;
+  }
+
+  updateShortcutCombo(action, combo);
+}
+
+export function resetAllShortcutCombos() {
+  for (const [action, data] of Object.entries(defaultRegistry)) {
+    updateShortcutCombo(action, data.combo);
+  }
 }
 
 function parseCombo(combo: string) {

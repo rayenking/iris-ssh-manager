@@ -12,6 +12,7 @@ interface UiState {
   errorToast: string | null;
 
   toggleSidebar: () => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
   toggleCommandPalette: () => void;
   toggleSnippets: () => void;
   setImportDialogOpen: (open: boolean) => void;
@@ -31,6 +32,8 @@ export const useUiStore = create<UiState>((set) => ({
   errorToast: null,
 
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+
+  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   
   toggleCommandPalette: () => set((state) => ({ commandPaletteOpen: !state.commandPaletteOpen })),
 

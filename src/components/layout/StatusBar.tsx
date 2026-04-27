@@ -1,14 +1,15 @@
 import { Moon, Sun, Activity } from 'lucide-react';
 import { useUiStore } from '../../stores/uiStore';
-import { applyTheme } from '../../lib/themes';
+import { useSettingsStore } from '../../stores/settingsStore';
 
 export function StatusBar() {
   const { currentTheme, setTheme } = useUiStore();
+  const updateTheme = useSettingsStore((state) => state.setTheme);
 
   const toggleTheme = () => {
     const newTheme = currentTheme === 'dark-minimal' ? 'iris-pink' : 'dark-minimal';
     setTheme(newTheme);
-    applyTheme(newTheme);
+    updateTheme(newTheme);
   };
 
   return (

@@ -7,6 +7,7 @@ import { Terminal } from '@xterm/xterm';
 import { useEffect, useRef } from 'react';
 import { useSSH } from '../../hooks/useSSH';
 import { useTerminalStore } from '../../stores/terminalStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { TunnelManager } from '../tunnels/TunnelManager';
 
 interface Props {
@@ -18,10 +19,10 @@ function getTerminalTheme() {
   const styles = getComputedStyle(document.documentElement);
 
   return {
-    background: styles.getPropertyValue('--color-bg-primary').trim(),
-    foreground: styles.getPropertyValue('--color-text-primary').trim(),
-    cursor: styles.getPropertyValue('--color-text-primary').trim(),
-    selectionBackground: styles.getPropertyValue('--color-hover').trim(),
+    background: styles.getPropertyValue('--color-terminal-bg').trim() || styles.getPropertyValue('--color-bg-primary').trim(),
+    foreground: styles.getPropertyValue('--color-terminal-fg').trim() || styles.getPropertyValue('--color-text-primary').trim(),
+    cursor: styles.getPropertyValue('--color-terminal-cursor').trim() || styles.getPropertyValue('--color-text-primary').trim(),
+    selectionBackground: styles.getPropertyValue('--color-terminal-selection').trim() || styles.getPropertyValue('--color-hover').trim(),
   };
 }
 
@@ -34,6 +35,7 @@ export function TerminalView({ connectionId, tabId }: Props) {
   const encoderRef = useRef(new TextEncoder());
   const { connect, disconnect, write, resize, connectionState, error } = useSSH();
   const { updateTabStatus, setTabSessionId } = useTerminalStore();
+  const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer } = useSettingsStore();
 
   useEffect(() => {
     const terminalHost = terminalHostRef.current;
@@ -45,10 +47,11 @@ export function TerminalView({ connectionId, tabId }: Props) {
     const terminal = new Terminal({
       allowTransparency: true,
       convertEol: true,
-      cursorBlink: true,
-      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-      fontSize: 13,
-      scrollback: 5000,
+      cursorBlink,
+      cursorStyle,
+      fontFamily: terminalFont,
+      fontSize: terminalFontSize,
+      scrollback: scrollbackBuffer,
       theme: getTerminalTheme(),
     });
     const fitAddon = new FitAddon();
@@ -98,6 +101,25 @@ export function TerminalView({ connectionId, tabId }: Props) {
       });
     };
 
+    const applyTerminalSettings = () => {
+      const currentTerminal = terminalRef.current;
+
+      if (!currentTerminal) {
+        return;
+      }
+
+      currentTerminal.options.cursorBlink = cursorBlink;
+      currentTerminal.options.cursorStyle = cursorStyle;
+      currentTerminal.options.fontFamily = terminalFont;
+      currentTerminal.options.fontSize = terminalFontSize;
+      currentTerminal.options.scrollback = scrollbackBuffer;
+      currentTerminal.options.theme = getTerminalTheme();
+      currentTerminal.refresh(0, currentTerminal.rows - 1);
+      fitAddon.fit();
+    };
+
+    applyTerminalSettings();
+
     const resizeObserver = new ResizeObserver(() => {
       syncRemoteSize();
     });
@@ -117,6 +139,24 @@ export function TerminalView({ connectionId, tabId }: Props) {
       fitAddonRef.current = null;
     };
   }, [resize, write]);
+
+  useEffect(() => {
+    const terminal = terminalRef.current;
+    const fitAddon = fitAddonRef.current;
+
+    if (!terminal || !fitAddon) {
+      return;
+    }
+
+    terminal.options.cursorBlink = cursorBlink;
+    terminal.options.cursorStyle = cursorStyle;
+    terminal.options.fontFamily = terminalFont;
+    terminal.options.fontSize = terminalFontSize;
+    terminal.options.scrollback = scrollbackBuffer;
+    terminal.options.theme = getTerminalTheme();
+    terminal.refresh(0, terminal.rows - 1);
+    fitAddon.fit();
+  }, [cursorBlink, cursorStyle, scrollbackBuffer, terminalFont, terminalFontSize]);
 
   useEffect(() => {
     let isDisposed = false;

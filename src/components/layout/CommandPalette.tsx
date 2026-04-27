@@ -3,6 +3,7 @@ import { useUiStore } from '../../stores/uiStore';
 import { useConnectionStore } from '../../stores/connectionStore';
 import { useSnippetStore } from '../../stores/snippetStore';
 import { useTerminalStore } from '../../stores/terminalStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { tauriApi } from '../../lib/tauri';
 import { Search, Terminal, Code, Zap, Settings, RefreshCw, SunMoon } from 'lucide-react';
 
@@ -16,7 +17,8 @@ interface PaletteItem {
 }
 
 export function CommandPalette() {
-  const { commandPaletteOpen, toggleCommandPalette, currentTheme, setTheme, setImportDialogOpen, setSettingsOpen } = useUiStore();
+  const { commandPaletteOpen, toggleCommandPalette, currentTheme, setImportDialogOpen, setSettingsOpen } = useUiStore();
+  const setTheme = useSettingsStore((state) => state.setTheme);
   const { connections } = useConnectionStore();
   const { snippets } = useSnippetStore();
   const { openTab, activeTabId, tabs } = useTerminalStore();
@@ -93,6 +95,9 @@ export function CommandPalette() {
       icon: <Settings className="w-4 h-4" />,
       onSelect: () => {
         setSettingsOpen(true);
+        if (commandPaletteOpen) {
+          toggleCommandPalette();
+        }
       }
     },
     {

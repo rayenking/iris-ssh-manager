@@ -15,11 +15,12 @@ import { useSettingsStore } from "./stores/settingsStore";
 import { applyTheme } from "./lib/themes";
 import { initGlobalKeybindings, registerShortcut, unregisterShortcut } from "./lib/keybindings";
 import type { Connection } from "./types/connection";
+import { SettingsPage } from "./components/settings/SettingsPage";
 
 function App() {
-  const { currentTheme, snippetsOpen, toggleSnippets, importDialogOpen, setImportDialogOpen, settingsOpen, setSettingsOpen, toggleCommandPalette } = useUiStore();
+  const { currentTheme, snippetsOpen, toggleSnippets, importDialogOpen, setImportDialogOpen, settingsOpen, toggleCommandPalette, setSidebarCollapsed } = useUiStore();
   const { tabs, activeTabId } = useTerminalStore();
-  const { loadSettings, keybindings } = useSettingsStore();
+  const { loadSettings, keybindings, sidebarDefaultState, theme } = useSettingsStore();
   const [editingConnection, setEditingConnection] = useState<Connection | null | undefined>(undefined);
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
 
@@ -28,8 +29,12 @@ function App() {
   }, [loadSettings]);
 
   useEffect(() => {
-    applyTheme(currentTheme);
-  }, [currentTheme]);
+    setSidebarCollapsed(sidebarDefaultState === 'collapsed');
+  }, [setSidebarCollapsed, sidebarDefaultState]);
+
+  useEffect(() => {
+    applyTheme(theme || currentTheme);
+  }, [currentTheme, theme]);
 
   useEffect(() => {
     return initGlobalKeybindings(keybindings);
@@ -112,24 +117,7 @@ function App() {
       </div>
       
       <ImportDialog isOpen={importDialogOpen} onClose={() => setImportDialogOpen(false)} />
-      {settingsOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-[var(--color-bg-primary)] p-6 rounded-lg border border-[var(--color-border)] shadow-xl max-w-md w-full">
-            <h2 className="text-xl font-medium text-[var(--color-text-primary)] mb-4">Settings</h2>
-            <p className="text-[var(--color-text-muted)] mb-6 text-sm">
-              The full settings page will be implemented in Task 13.
-            </p>
-            <div className="flex justify-end">
-              <button 
-                className="px-4 py-2 bg-[var(--color-accent)] text-white rounded text-sm font-medium hover:bg-[var(--color-accent)]/90 transition-colors" 
-                onClick={() => setSettingsOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {settingsOpen && <SettingsPage />}
       <ErrorToast />
       <CommandPalette />
       
