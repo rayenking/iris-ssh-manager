@@ -1,17 +1,21 @@
 import { create } from 'zustand';
-import type { TerminalTab } from '../types/terminal';
-import type { TabStatus } from '../types/terminal';
+import type { AppTab, TabStatus, TerminalTab } from '../types/terminal';
 
 interface TerminalState {
-  tabs: TerminalTab[];
+  tabs: AppTab[];
   activeTabId: string | null;
-  
+
   openTab: (connectionId: string, title: string) => void;
+  openFileBrowserTab: (terminalTabId: string, connectionId: string, title: string) => void;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
   updateTabStatus: (id: string, status: TabStatus) => void;
   setTabSessionId: (id: string, sessionId?: string) => void;
+}
+
+function isTerminalTab(tab: AppTab): tab is TerminalTab {
+  return tab.kind === 'terminal';
 }
 
 export const useTerminalStore = create<TerminalState>((set) => ({
@@ -23,27 +27,64 @@ export const useTerminalStore = create<TerminalState>((set) => ({
       id: crypto.randomUUID(),
       connectionId,
       title,
+      kind: 'terminal',
       status: 'connecting',
     };
 
     set((state) => ({
       tabs: [...state.tabs, newTab],
-      activeTabId: newTab.id
+      activeTabId: newTab.id,
     }));
+  },
+
+  openFileBrowserTab: (terminalTabId, connectionId, title) => {
+    set((state) => {
+      const existingTab = state.tabs.find(
+        (tab) => tab.kind === 'files' && tab.terminalTabId === terminalTabId,
+      );
+
+      if (existingTab) {
+        return { activeTabId: existingTab.id };
+      }
+
+      const newTab = {
+        id: crypto.randomUUID(),
+        connectionId,
+        title: `${title} Files`,
+        kind: 'files' as const,
+        terminalTabId,
+      };
+
+      return {
+        tabs: [...state.tabs, newTab],
+        activeTabId: newTab.id,
+      };
+    });
   },
 
   closeTab: (id) => {
     set((state) => {
-      const newTabs = state.tabs.filter(t => t.id !== id);
-      
-      let newActiveId = state.activeTabId;
-      if (state.activeTabId === id) {
-        newActiveId = newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null;
+      const targetTab = state.tabs.find((tab) => tab.id === id);
+      const tabsToRemove = new Set<string>([id]);
+
+      if (targetTab?.kind === 'terminal') {
+        state.tabs.forEach((tab) => {
+          if (tab.kind === 'files' && tab.terminalTabId === id) {
+            tabsToRemove.add(tab.id);
+          }
+        });
       }
+
+      const newTabs = state.tabs.filter((tab) => !tabsToRemove.has(tab.id));
+      const activeTabRemoved = state.activeTabId ? tabsToRemove.has(state.activeTabId) : false;
 
       return {
         tabs: newTabs,
-        activeTabId: newActiveId
+        activeTabId: activeTabRemoved
+          ? newTabs.length > 0
+            ? newTabs[newTabs.length - 1].id
+            : null
+          : state.activeTabId,
       };
     });
   },
@@ -52,13 +93,13 @@ export const useTerminalStore = create<TerminalState>((set) => ({
 
   updateTabStatus: (id, status) => {
     set((state) => ({
-      tabs: state.tabs.map((tab) => (tab.id === id ? { ...tab, status } : tab)),
+      tabs: state.tabs.map((tab) => (isTerminalTab(tab) && tab.id === id ? { ...tab, status } : tab)),
     }));
   },
 
   setTabSessionId: (id, sessionId) => {
     set((state) => ({
-      tabs: state.tabs.map((tab) => (tab.id === id ? { ...tab, sessionId } : tab)),
+      tabs: state.tabs.map((tab) => (isTerminalTab(tab) && tab.id === id ? { ...tab, sessionId } : tab)),
     }));
   },
 
@@ -69,5 +110,5 @@ export const useTerminalStore = create<TerminalState>((set) => ({
       newTabs.splice(toIndex, 0, movedTab);
       return { tabs: newTabs };
     });
-  }
+  },
 }));

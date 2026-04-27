@@ -22,22 +22,24 @@ export function SnippetManager() {
     s.command.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const activeTerminalTab = activeTab?.kind === 'terminal' ? activeTab : null;
+
   const categories = Array.from(new Set(filteredSnippets.map(s => s.category || 'Uncategorized'))).sort();
 
   const handleInsert = async (snippet: Snippet) => {
-    if (!activeTabId || !activeTab) return;
+    if (!activeTerminalTab?.sessionId) return;
     
     let finalCommand = snippet.command;
     
     try {
-      const connection = await tauriApi.getConnection(activeTab.connectionId);
+      const connection = await tauriApi.getConnection(activeTerminalTab.connectionId);
       finalCommand = finalCommand.replace(/\{\{hostname\}\}/g, connection.hostname);
       finalCommand = finalCommand.replace(/\{\{username\}\}/g, connection.username);
       finalCommand = finalCommand.replace(/\{\{port\}\}/g, connection.port.toString());
       
       const encoder = new TextEncoder();
       const data = encoder.encode(finalCommand);
-      await tauriApi.sshWrite(activeTabId, Array.from(data));
+      await tauriApi.sshWrite(activeTerminalTab.sessionId, Array.from(data));
     } catch (e) {
       console.error('Failed to insert snippet:', e);
     }
@@ -103,7 +105,7 @@ export function SnippetManager() {
                             e.stopPropagation();
                             handleInsert(snippet);
                           }}
-                          disabled={!activeTabId}
+                           disabled={!activeTerminalTab?.sessionId}
                           className="p-1.5 text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:bg-[var(--color-bg-tertiary)] rounded disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Insert into active terminal"
                         >

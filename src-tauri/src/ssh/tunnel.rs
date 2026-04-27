@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::io;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -698,8 +697,4 @@ pub(crate) fn forwarded_channel_sender(
 
 pub(crate) fn parse_tunnel_id(tunnel_id: &str) -> Result<Uuid> {
     Uuid::parse_str(tunnel_id).map_err(Into::into)
-}
-
-pub(crate) fn unsupported_socks_error(error: io::Error) -> anyhow::Error {
-    anyhow!(error)
 }

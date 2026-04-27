@@ -26,6 +26,7 @@ export function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
   
   const activeTab = tabs.find(t => t.id === activeTabId);
+  const activeTerminalTab = activeTab?.kind === 'terminal' ? activeTab : null;
 
   // Focus input when opened
   useEffect(() => {
@@ -50,16 +51,16 @@ export function CommandPalette() {
   if (!commandPaletteOpen) return null;
 
   const insertSnippet = async (command: string) => {
-    if (!activeTabId || !activeTab) return;
+    if (!activeTerminalTab?.sessionId) return;
     try {
-      const connection = await tauriApi.getConnection(activeTab.connectionId);
+      const connection = await tauriApi.getConnection(activeTerminalTab.connectionId);
       let finalCommand = command.replace(/\{\{hostname\}\}/g, connection.hostname);
       finalCommand = finalCommand.replace(/\{\{username\}\}/g, connection.username);
       finalCommand = finalCommand.replace(/\{\{port\}\}/g, connection.port.toString());
       
       const encoder = new TextEncoder();
       const data = encoder.encode(finalCommand);
-      await tauriApi.sshWrite(activeTabId, Array.from(data));
+      await tauriApi.sshWrite(activeTerminalTab.sessionId, Array.from(data));
     } catch (e) {
       console.error('Failed to insert snippet:', e);
     }
@@ -124,7 +125,7 @@ export function CommandPalette() {
       type: 'snippet' as const,
       icon: <Code className="w-4 h-4" />,
       onSelect: () => {
-        if (activeTabId) {
+        if (activeTerminalTab?.sessionId) {
           insertSnippet(s.command);
         } else {
           // Can't insert if no terminal active

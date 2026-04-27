@@ -4,6 +4,7 @@ import { TabBar } from "./components/layout/TabBar";
 import { StatusBar } from "./components/layout/StatusBar";
 import { ErrorToast } from "./components/layout/ErrorToast";
 import { ConnectionForm } from "./components/connections/ConnectionForm";
+import { FileBrowser } from "./components/sftp/FileBrowser";
 import { TerminalView } from "./components/terminal/TerminalView";
 import { CommandPalette } from "./components/layout/CommandPalette";
 import { SnippetManager } from "./components/snippets/SnippetManager";
@@ -69,7 +70,23 @@ function App() {
                 key={tab.id}
                 className={`absolute inset-0 ${activeTabId === tab.id ? 'block' : 'hidden'}`}
               >
-                <TerminalView connectionId={tab.connectionId} tabId={tab.id} />
+                {tab.kind === 'terminal' ? (
+                  <TerminalView connectionId={tab.connectionId} tabId={tab.id} />
+                ) : (() => {
+                  const terminalTab = tabs.find(
+                    (candidate) => candidate.kind === 'terminal' && candidate.id === tab.terminalTabId,
+                  );
+
+                  if (!terminalTab?.sessionId) {
+                    return (
+                      <div className="flex h-full items-center justify-center bg-[var(--color-bg-primary)] p-4 text-sm text-[var(--color-text-muted)]">
+                        Connect the terminal tab first to open SFTP.
+                      </div>
+                    );
+                  }
+
+                  return <FileBrowser connectionTitle={terminalTab.title} sessionId={terminalTab.sessionId} />;
+                })()}
               </div>
             ))}
           </div>

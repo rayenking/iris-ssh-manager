@@ -1,11 +1,11 @@
 import { X } from 'lucide-react';
-import type { TerminalTab as TerminalTabType } from '../../types/terminal';
+import type { AppTab, TerminalTab as TerminalTabType } from '../../types/terminal';
 
 interface Props {
   isActive: boolean;
   onClose: () => void;
   onSelect: () => void;
-  tab: TerminalTabType;
+  tab: AppTab;
 }
 
 function getStatusClasses(status: TerminalTabType['status']) {
@@ -25,6 +25,8 @@ function getStatusClasses(status: TerminalTabType['status']) {
 }
 
 export function TerminalTab({ isActive, onClose, onSelect, tab }: Props) {
+  const statusDotClass = tab.kind === 'terminal' ? getStatusClasses(tab.status) : 'bg-[var(--color-accent)]';
+
   return (
     <div
       onClick={onSelect}
@@ -35,7 +37,7 @@ export function TerminalTab({ isActive, onClose, onSelect, tab }: Props) {
       }`}
     >
       <div className="flex items-center gap-2 flex-1 min-w-0">
-        <span className={`w-2 h-2 rounded-full ${getStatusClasses(tab.status)}`} />
+        <span className={`w-2 h-2 rounded-full ${statusDotClass}`} />
         <span className="text-sm truncate text-[var(--color-text-primary)]">{tab.title}</span>
       </div>
 
