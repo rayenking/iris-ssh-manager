@@ -47,3 +47,15 @@ export interface CreateGroupInput {
 }
 
 export interface UpdateGroupInput extends Partial<CreateGroupInput> {}
+
+export interface ParsedSshHost {
+  host_alias: string;
+  hostname: string | null;
+  port: number | null;
+  username: string | null;
+  identity_file: string | null;
+  proxy_jump: string | null;
+  local_forwards: string[];
+  remote_forwards: string[];
+  dynamic_forwards: string[];
+}

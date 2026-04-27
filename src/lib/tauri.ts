@@ -5,7 +5,8 @@ import type {
   CreateConnectionInput, 
   UpdateConnectionInput,
   CreateGroupInput,
-  UpdateGroupInput
+  UpdateGroupInput,
+  ParsedSshHost
 } from '../types/connection';
 
 export const tauriApi = {
@@ -40,5 +41,11 @@ export const tauriApi = {
     invoke('update_group', { id, data }),
     
   deleteGroup: (id: string): Promise<void> => 
-    invoke('delete_group', { id })
+    invoke('delete_group', { id }),
+
+  parseSshConfig: (configPath?: string): Promise<ParsedSshHost[]> =>
+    invoke('parse_ssh_config', { configPath: configPath ?? null }),
+
+  importSshConfig: (configPath: string | null, hostAliases: string[]): Promise<Connection[]> =>
+    invoke('import_ssh_config', { configPath, hostAliases }),
 };
