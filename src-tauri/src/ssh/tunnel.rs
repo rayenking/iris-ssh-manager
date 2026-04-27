@@ -134,10 +134,14 @@ impl TunnelManager {
             Self::run_remote_forward_router(router_state, forwarded_rx).await;
         });
 
-        let manager = Self { state, handle };
+        // Store the router task directly via the Arc<Mutex> — avoid blocking_lock()
+        // which panics inside a tokio runtime context.
+        {
+            let mut guard = state.try_lock().expect("state lock is uncontested during construction");
+            guard.remote_forward_router = Some(router_task);
+        }
 
-        manager.state.blocking_lock().remote_forward_router = Some(router_task);
-        manager
+        Self { state, handle }
     }
 
     pub async fn set_session_id(&self, session_id: String) {

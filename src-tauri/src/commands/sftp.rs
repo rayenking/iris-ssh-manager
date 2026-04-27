@@ -12,6 +12,7 @@ use crate::ssh::sftp::{FileEntry, SftpSession, list_local_dir};
 const TRANSFER_CHUNK_SIZE: usize = 64 * 1024;
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TransferProgress {
     pub bytes_transferred: u64,
     pub total_bytes: u64,
