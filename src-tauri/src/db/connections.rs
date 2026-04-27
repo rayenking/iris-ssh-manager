@@ -5,6 +5,7 @@ use std::sync::Mutex;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Connection {
     pub id: String,
     pub name: String,
@@ -24,6 +25,7 @@ pub struct Connection {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateConnectionInput {
     pub name: String,
     pub hostname: String,
@@ -40,6 +42,7 @@ pub struct CreateConnectionInput {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateConnectionInput {
     pub name: Option<String>,
     pub hostname: Option<String>,

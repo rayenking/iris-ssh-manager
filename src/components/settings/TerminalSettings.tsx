@@ -13,6 +13,7 @@ export function TerminalSettings() {
     cursorBlink,
     scrollbackBuffer,
     bell,
+    autoReconnect,
     saveTerminalSettings,
   } = useSettingsStore();
 
@@ -23,11 +24,12 @@ export function TerminalSettings() {
     cursorBlink,
     scrollbackBuffer,
     bell,
+    autoReconnect,
   });
 
   useEffect(() => {
-    setDraft({ terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer, bell });
-  }, [bell, cursorBlink, cursorStyle, scrollbackBuffer, terminalFont, terminalFontSize]);
+    setDraft({ terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer, bell, autoReconnect });
+  }, [autoReconnect, bell, cursorBlink, cursorStyle, scrollbackBuffer, terminalFont, terminalFontSize]);
 
   const commit = (next: Partial<typeof draft>) => {
     const merged = { ...draft, ...next };
@@ -148,6 +150,24 @@ export function TerminalSettings() {
             </button>
           ))}
         </div>
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-base font-medium text-[var(--color-text-primary)]">Auto-reconnect</h3>
+          <p className="text-sm text-[var(--color-text-muted)]">Automatically reconnect when an SSH session drops unexpectedly.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => commit({ autoReconnect: !draft.autoReconnect })}
+          className={`rounded border px-3 py-2 text-sm transition-colors ${
+            draft.autoReconnect
+              ? 'border-[var(--color-accent)] bg-[var(--color-selected)] text-[var(--color-text-primary)]'
+              : 'border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]'
+          }`}
+        >
+          {draft.autoReconnect ? 'Enabled' : 'Disabled'}
+        </button>
       </section>
     </div>
   );

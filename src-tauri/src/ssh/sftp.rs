@@ -11,6 +11,7 @@ const DIRECTORY_MODE_MASK: u32 = 0o170000;
 const DIRECTORY_MODE_VALUE: u32 = 0o040000;
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FileEntry {
     pub name: String,
     pub size: u64,

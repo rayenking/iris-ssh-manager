@@ -27,6 +27,7 @@ interface TerminalSettings {
   cursorBlink: boolean;
   scrollbackBuffer: number;
   bell: BellStyle;
+  autoReconnect: boolean;
 }
 
 interface SettingsState {
@@ -40,6 +41,7 @@ interface SettingsState {
   cursorBlink: boolean;
   scrollbackBuffer: number;
   bell: BellStyle;
+  autoReconnect: boolean;
   settingsLoaded: boolean;
 
   loadSettings: () => Promise<void>;
@@ -79,6 +81,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   cursorBlink: true,
   scrollbackBuffer: 5000,
   bell: 'visual',
+  autoReconnect: true,
   settingsLoaded: false,
 
   loadSettings: async () => {
@@ -97,6 +100,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       const cursorBlink = allSettings['cursorBlink'] ? allSettings['cursorBlink'] === 'true' : true;
       const scrollbackBuffer = allSettings['scrollbackBuffer'] ? parseInt(allSettings['scrollbackBuffer'], 10) : 5000;
       const bell = (allSettings['bell'] as BellStyle) || 'visual';
+      const autoReconnect = allSettings['autoReconnect'] ? allSettings['autoReconnect'] === 'true' : true;
 
       Object.entries(keybindings).forEach(([action, combo]) => updateShortcutCombo(action, combo));
 
@@ -111,6 +115,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         cursorBlink,
         scrollbackBuffer,
         bell,
+        autoReconnect,
         settingsLoaded: true,
       });
 
@@ -135,6 +140,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       await tauriApi.setSetting('cursorBlink', state.cursorBlink.toString());
       await tauriApi.setSetting('scrollbackBuffer', state.scrollbackBuffer.toString());
       await tauriApi.setSetting('bell', state.bell);
+      await tauriApi.setSetting('autoReconnect', state.autoReconnect.toString());
     } catch (error) {
       console.error('Failed to save settings:', error);
     }

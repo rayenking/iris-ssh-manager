@@ -2,3 +2,13 @@
 @import "./styles/themes/dark-minimal.css";
 @import "./styles/themes/iris-pink.css";
 
+:root {
+  color-scheme: dark;
+}
+
+select,
+select option {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+

@@ -4,6 +4,7 @@ use std::fs;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ParsedSshHost {
     pub host_alias: String,
     pub hostname: Option<String>,

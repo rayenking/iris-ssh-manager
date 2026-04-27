@@ -5,6 +5,7 @@ use std::sync::Mutex;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Snippet {
     pub id: String,
     pub name: String,
@@ -15,6 +16,7 @@ pub struct Snippet {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateSnippetInput {
     pub name: String,
     pub command: String,
@@ -24,6 +26,7 @@ pub struct CreateSnippetInput {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateSnippetInput {
     pub name: Option<String>,
     pub command: Option<String>,
