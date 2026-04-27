@@ -96,10 +96,9 @@ export function FileBrowser({ connectionTitle, sessionId }: Props) {
       name: string,
       event: React.MouseEvent<HTMLButtonElement>,
     ) => {
-      const setter = pane === 'local' ? setLocalSelection : setRemoteSelection;
-      const setActive = pane === 'local' ? setLocalSelection : setRemoteSelection;
       setActivePane(pane);
 
+      const setter = pane === 'local' ? setLocalSelection : setRemoteSelection;
       setter((currentSelection) => {
         if (event.ctrlKey || event.metaKey) {
           return currentSelection.includes(name)

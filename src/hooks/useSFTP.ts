@@ -1,7 +1,7 @@
 import { Channel } from '@tauri-apps/api/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { tauriApi } from '../lib/tauri';
-import type { FileEntry, TransferDirection, TransferJob, TransferProgress } from '../types/sftp';
+import type { TransferDirection, TransferJob, TransferProgress } from '../types/sftp';
 
 const EMPTY_PROGRESS: TransferProgress = {
   bytesTransferred: 0,
