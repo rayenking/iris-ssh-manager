@@ -50,7 +50,6 @@ export function TerminalView({ connectionId, tabId }: Props) {
 
     const terminal = new Terminal({
       allowTransparency: true,
-      convertEol: true,
       cursorBlink,
       cursorStyle,
       fontFamily: terminalFont,
