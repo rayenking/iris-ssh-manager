@@ -1,1 +1,4 @@
 @import "tailwindcss";
+@import "./styles/themes/dark-minimal.css";
+@import "./styles/themes/iris-pink.css";
+
