@@ -54,7 +54,7 @@ export function initGlobalKeybindings(customBindings: Record<string, string>) {
     updateShortcutCombo(action, combo);
   }
 
-  window.addEventListener('keydown', (e) => {
+  const handleKeyDown = (e: KeyboardEvent) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
       if (e.key.toLowerCase() !== 'k' || (!e.ctrlKey && !e.metaKey)) {
         return;
@@ -81,6 +81,11 @@ export function initGlobalKeybindings(customBindings: Record<string, string>) {
         break;
       }
     }
-  });
-}
+  };
 
+  window.addEventListener('keydown', handleKeyDown);
+
+  return () => {
+    window.removeEventListener('keydown', handleKeyDown);
+  };
+}

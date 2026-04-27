@@ -32,7 +32,7 @@ function App() {
   }, [currentTheme]);
 
   useEffect(() => {
-    initGlobalKeybindings(keybindings);
+    return initGlobalKeybindings(keybindings);
   }, [keybindings]);
 
   useEffect(() => {
