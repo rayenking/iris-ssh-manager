@@ -10,6 +10,7 @@ export function SnippetManager() {
   const { snippets, searchQuery, fetchSnippets, setSearchQuery, deleteSnippet } = useSnippetStore();
   const { tabs, activeTabId } = useTerminalStore();
   const [editingSnippet, setEditingSnippet] = useState<Snippet | null | undefined>(undefined);
+  const isTauriRuntime = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
   useEffect(() => {
     fetchSnippets().catch(console.error);
@@ -27,7 +28,7 @@ export function SnippetManager() {
   const categories = Array.from(new Set(filteredSnippets.map(s => s.category || 'Uncategorized'))).sort();
 
   const handleInsert = async (snippet: Snippet) => {
-    if (!activeTerminalTab?.sessionId) return;
+    if (!isTauriRuntime || !activeTerminalTab?.sessionId) return;
     
     let finalCommand = snippet.command;
     
@@ -58,6 +59,7 @@ export function SnippetManager() {
         <h2 className="text-lg font-medium text-[var(--color-text-primary)]">Snippets</h2>
         <button
           onClick={() => setEditingSnippet(null)}
+          disabled={!isTauriRuntime}
           className="p-1 rounded hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
           title="New Snippet"
         >
@@ -105,7 +107,7 @@ export function SnippetManager() {
                             e.stopPropagation();
                             handleInsert(snippet);
                           }}
-                           disabled={!activeTerminalTab?.sessionId}
+                          disabled={!isTauriRuntime || !activeTerminalTab?.sessionId}
                           className="p-1.5 text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:bg-[var(--color-bg-tertiary)] rounded disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Insert into active terminal"
                         >
@@ -116,6 +118,7 @@ export function SnippetManager() {
                             e.stopPropagation();
                             setEditingSnippet(snippet);
                           }}
+                          disabled={!isTauriRuntime}
                           className="p-1.5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] rounded"
                           title="Edit"
                         >
@@ -123,6 +126,7 @@ export function SnippetManager() {
                         </button>
                         <button
                           onClick={(e) => handleDelete(snippet.id, e)}
+                          disabled={!isTauriRuntime}
                           className="p-1.5 text-[var(--color-text-secondary)] hover:text-[var(--color-error)] hover:bg-[var(--color-bg-tertiary)] rounded"
                           title="Delete"
                         >
@@ -142,10 +146,12 @@ export function SnippetManager() {
       </div>
 
       {editingSnippet !== undefined && (
+        isTauriRuntime ? (
         <SnippetForm
           snippet={editingSnippet}
           onClose={() => setEditingSnippet(undefined)}
         />
+        ) : null
       )}
     </div>
   );

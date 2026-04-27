@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import type { Snippet, CreateSnippetInput, UpdateSnippetInput } from '../types/snippet';
 import { tauriApi } from '../lib/tauri';
 
+const isTauriRuntime = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
 interface SnippetState {
   snippets: Snippet[];
   searchQuery: string;
@@ -18,6 +20,11 @@ export const useSnippetStore = create<SnippetState>((set) => ({
   searchQuery: '',
 
   fetchSnippets: async () => {
+    if (!isTauriRuntime) {
+      set({ snippets: [] });
+      return;
+    }
+
     try {
       const snippets = await tauriApi.listSnippets();
       set({ snippets });
@@ -28,6 +35,10 @@ export const useSnippetStore = create<SnippetState>((set) => ({
   },
 
   createSnippet: async (data) => {
+    if (!isTauriRuntime) {
+      throw new Error('Snippet management is only available in the Tauri app.');
+    }
+
     try {
       const newSnippet = await tauriApi.createSnippet(data);
       set((state) => ({ snippets: [...state.snippets, newSnippet] }));
@@ -39,6 +50,10 @@ export const useSnippetStore = create<SnippetState>((set) => ({
   },
 
   updateSnippet: async (id, data) => {
+    if (!isTauriRuntime) {
+      throw new Error('Snippet management is only available in the Tauri app.');
+    }
+
     try {
       const updatedSnippet = await tauriApi.updateSnippet(id, data);
       set((state) => ({
@@ -51,6 +66,10 @@ export const useSnippetStore = create<SnippetState>((set) => ({
   },
 
   deleteSnippet: async (id) => {
+    if (!isTauriRuntime) {
+      throw new Error('Snippet management is only available in the Tauri app.');
+    }
+
     try {
       await tauriApi.deleteSnippet(id);
       set((state) => ({

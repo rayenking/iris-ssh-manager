@@ -13,11 +13,11 @@ import { useUiStore } from "./stores/uiStore";
 import { useTerminalStore } from "./stores/terminalStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { applyTheme } from "./lib/themes";
-import { initGlobalKeybindings } from "./lib/keybindings";
+import { initGlobalKeybindings, registerShortcut, unregisterShortcut } from "./lib/keybindings";
 import type { Connection } from "./types/connection";
 
 function App() {
-  const { currentTheme, snippetsOpen, toggleSnippets, importDialogOpen, setImportDialogOpen, settingsOpen, setSettingsOpen } = useUiStore();
+  const { currentTheme, snippetsOpen, toggleSnippets, importDialogOpen, setImportDialogOpen, settingsOpen, setSettingsOpen, toggleCommandPalette } = useUiStore();
   const { tabs, activeTabId } = useTerminalStore();
   const { loadSettings, keybindings } = useSettingsStore();
   const [editingConnection, setEditingConnection] = useState<Connection | null | undefined>(undefined);
@@ -34,6 +34,11 @@ function App() {
   useEffect(() => {
     initGlobalKeybindings(keybindings);
   }, [keybindings]);
+
+  useEffect(() => {
+    registerShortcut('command-palette', toggleCommandPalette);
+    return () => unregisterShortcut('command-palette');
+  }, [toggleCommandPalette]);
 
   useEffect(() => {
     const handleOpen = (e: CustomEvent) => setEditingConnection(e.detail?.connection || null);
