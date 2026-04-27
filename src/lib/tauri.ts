@@ -16,7 +16,6 @@ const SETTINGS_STORAGE_PREFIX = 'iris-ssh-manager.settings.';
 const memorySettingsFallback = new Map<string, string>();
 const CONNECTIONS_STORAGE_KEY = 'iris-ssh-manager.connections';
 const GROUPS_STORAGE_KEY = 'iris-ssh-manager.connection-groups';
-const CREDENTIALS_STORAGE_KEY = 'iris-ssh-manager.connection-credentials';
 
 const memoryBrowserFallback = new Map<string, string>();
 
@@ -143,14 +142,6 @@ function setBrowserGroups(groups: ConnectionGroup[]) {
   writeBrowserFallback(GROUPS_STORAGE_KEY, groups);
 }
 
-function getBrowserCredentials() {
-  return readBrowserFallback<Record<string, string>>(CREDENTIALS_STORAGE_KEY, {});
-}
-
-function setBrowserCredentials(credentials: Record<string, string>) {
-  writeBrowserFallback(CREDENTIALS_STORAGE_KEY, credentials);
-}
-
 function createBrowserConnection(data: CreateConnectionInput): Connection {
   const connections = getBrowserConnections();
   const now = getNowIso();
@@ -226,12 +217,6 @@ function duplicateBrowserConnection(connectionId: string) {
 function deleteBrowserConnection(connectionId: string) {
   const connections = getBrowserConnections().filter((connection) => connection.id !== connectionId);
   setBrowserConnections(connections);
-
-  const credentials = getBrowserCredentials();
-  if (credentials[connectionId]) {
-    delete credentials[connectionId];
-    setBrowserCredentials(credentials);
-  }
 }
 
 function createBrowserGroup(data: CreateGroupInput): ConnectionGroup {
@@ -298,10 +283,6 @@ function searchBrowserConnections(query: string) {
 
     return searchableValues.some((value) => value.includes(normalizedQuery));
   });
-}
-
-function readBrowserCredential(connectionId: string) {
-  return getBrowserCredentials()[connectionId] ?? null;
 }
 
 export const tauriApi = {
@@ -377,30 +358,22 @@ export const tauriApi = {
   storeCredential: (connectionId: string, secret: string): Promise<void> =>
     isTauriRuntime()
       ? invoke('store_credential', { connectionId, secret })
-      : Promise.resolve().then(() => {
-          const credentials = getBrowserCredentials();
-          credentials[connectionId] = secret;
-          setBrowserCredentials(credentials);
-        }),
+      : Promise.resolve(),
 
   retrieveCredential: (connectionId: string): Promise<string | null> =>
     isTauriRuntime()
       ? invoke('retrieve_credential', { connectionId })
-      : Promise.resolve(readBrowserCredential(connectionId)),
+      : Promise.resolve(null),
 
   deleteCredential: (connectionId: string): Promise<void> =>
     isTauriRuntime()
       ? invoke('delete_credential', { connectionId })
-      : Promise.resolve().then(() => {
-          const credentials = getBrowserCredentials();
-          delete credentials[connectionId];
-          setBrowserCredentials(credentials);
-        }),
+      : Promise.resolve(),
 
   hasCredential: (connectionId: string): Promise<boolean> =>
     isTauriRuntime()
       ? invoke('has_credential', { connectionId })
-      : Promise.resolve(readBrowserCredential(connectionId) !== null),
+      : Promise.resolve(false),
 
   sshConnect: (connectionId: string, onData: Channel<number[]>): Promise<string> =>
     isTauriRuntime()
