@@ -304,6 +304,9 @@ export function TerminalView({
     emitStatusChange('connecting');
 
     try {
+      const initialCols = terminal.cols || 80;
+      const initialRows = terminal.rows || 24;
+
       const sessionId = await connect(connectionId, (data) => {
         const bytes = new Uint8Array(data);
         terminalRef.current?.write(bytes);
@@ -313,20 +316,12 @@ export function TerminalView({
         if (osc7Match?.[1]) {
           lastCwdRef.current = decodeURIComponent(osc7Match[1]);
         }
-      });
+      }, initialCols, initialRows);
 
       sessionIdRef.current = sessionId;
       emitSessionChange(sessionId);
       emitStatusChange('connected');
       reconnectAttemptRef.current = 0;
-
-      requestAnimationFrame(() => {
-        const t = terminalRef.current;
-        const f = fitAddonRef.current;
-        if (!t || !f || !sessionIdRef.current) return;
-        f.fit();
-        void resize(sessionIdRef.current, t.cols, t.rows).catch(() => {});
-      });
 
       const encoder = encoderRef.current;
 
