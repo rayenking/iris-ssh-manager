@@ -1,5 +1,23 @@
 import { useCallback } from 'react';
 import type { Terminal } from '@xterm/xterm';
+import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager';
+
+const isTauri = () => !!(window as any).__TAURI_INTERNALS__;
+
+async function clipboardWrite(text: string) {
+  if (isTauri()) {
+    await writeText(text);
+  } else {
+    await navigator.clipboard.writeText(text);
+  }
+}
+
+async function clipboardRead(): Promise<string> {
+  if (isTauri()) {
+    return await readText();
+  }
+  return await navigator.clipboard.readText();
+}
 
 interface UseTerminalCopyPasteOptions {
   terminalRef: React.MutableRefObject<Terminal | null>;
@@ -24,7 +42,7 @@ export function useTerminalCopyPaste({
 
     const selection = terminal.getSelection();
     if (selection) {
-      void navigator.clipboard.writeText(selection);
+      void clipboardWrite(selection);
     }
   }, [terminalRef]);
 
@@ -33,7 +51,7 @@ export function useTerminalCopyPaste({
     if (!sessionId) return;
 
     try {
-      const text = await navigator.clipboard.readText();
+      const text = await clipboardRead();
       if (text) {
         const data = Array.from(encoderRef.current.encode(text));
         await writeFn(sessionId, data);
@@ -47,7 +65,7 @@ export function useTerminalCopyPaste({
     terminal.onSelectionChange(() => {
       const selection = terminal.getSelection();
       if (selection) {
-        void navigator.clipboard.writeText(selection);
+        void clipboardWrite(selection);
       }
     });
   }, []);
