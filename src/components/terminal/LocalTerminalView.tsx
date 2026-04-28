@@ -2,6 +2,7 @@ import '@xterm/xterm/css/xterm.css';
 
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
+import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
 import { useCallback, useEffect, useRef } from 'react';
@@ -9,6 +10,7 @@ import { useLocalShell } from '../../hooks/useLocalShell';
 import { useTerminalCopyPaste } from '../../hooks/useTerminalCopyPaste';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import type { TerminalCopyPasteHandle } from './TerminalView';
 import type { TabStatus } from '../../types/terminal';
 
@@ -107,6 +109,9 @@ export function LocalTerminalView({
 
     terminal.loadAddon(fitAddon);
     terminal.loadAddon(searchAddon);
+    terminal.loadAddon(new WebLinksAddon((_event, uri) => {
+      void shellOpen(uri);
+    }));
     terminal.open(terminalHost);
     attachCopyPaste(terminal);
 

@@ -2,6 +2,7 @@ import '@xterm/xterm/css/xterm.css';
 
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
+import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -11,6 +12,7 @@ import { useTerminalStore } from '../../stores/terminalStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { TunnelManager } from '../tunnels/TunnelManager';
 import { RotateCw, Network } from 'lucide-react';
+import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import type { TabStatus } from '../../types/terminal';
 
 export interface TerminalCopyPasteHandle {
@@ -121,6 +123,9 @@ export function TerminalView({
 
     terminal.loadAddon(fitAddon);
     terminal.loadAddon(searchAddon);
+    terminal.loadAddon(new WebLinksAddon((_event, uri) => {
+      void shellOpen(uri);
+    }));
     terminal.open(terminalHost);
     attachCopyPaste(terminal);
 
