@@ -1,9 +1,8 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import type { Terminal } from '@xterm/xterm';
 
 interface UseTerminalCopyPasteOptions {
   terminalRef: React.MutableRefObject<Terminal | null>;
-  containerRef: React.MutableRefObject<HTMLDivElement | null>;
   sessionIdRef: React.MutableRefObject<string | null>;
   encoderRef: React.MutableRefObject<TextEncoder>;
   writeFn: (sessionId: string, data: number[]) => Promise<void>;
@@ -11,7 +10,6 @@ interface UseTerminalCopyPasteOptions {
 
 export function useTerminalCopyPaste({
   terminalRef,
-  containerRef,
   sessionIdRef,
   encoderRef,
   writeFn,
@@ -45,31 +43,38 @@ export function useTerminalCopyPaste({
     }
   }, [sessionIdRef, encoderRef, writeFn]);
 
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+  const attachKeyHandler = useCallback((terminal: Terminal) => {
+    terminal.attachCustomKeyEventHandler((e: KeyboardEvent) => {
+      if (e.type !== 'keydown') return true;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
-        if (e.key === 'C' || e.key === 'c') {
-          e.preventDefault();
-          e.stopPropagation();
-          copySelection();
-        } else if (e.key === 'V' || e.key === 'v') {
-          e.preventDefault();
-          e.stopPropagation();
-          void pasteClipboard();
-        }
+      const ctrl = e.ctrlKey || e.metaKey;
+
+      if (ctrl && e.shiftKey && (e.key === 'C' || e.key === 'c')) {
+        e.preventDefault();
+        copySelection();
+        return false;
       }
-    };
 
-    container.addEventListener('keydown', handleKeyDown, true);
-    return () => container.removeEventListener('keydown', handleKeyDown, true);
-  }, [containerRef, copySelection, pasteClipboard]);
+      if (ctrl && e.shiftKey && (e.key === 'V' || e.key === 'v')) {
+        e.preventDefault();
+        void pasteClipboard();
+        return false;
+      }
+
+      if (ctrl && !e.shiftKey && (e.key === 'v' || e.key === 'V')) {
+        e.preventDefault();
+        void pasteClipboard();
+        return false;
+      }
+
+      return true;
+    });
+  }, [copySelection, pasteClipboard]);
 
   return {
     copySelection,
     pasteClipboard,
     hasSelection,
+    attachKeyHandler,
   };
 }
