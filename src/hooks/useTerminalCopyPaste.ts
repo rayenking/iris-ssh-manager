@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { Terminal } from '@xterm/xterm';
 
 interface UseTerminalCopyPasteOptions {
@@ -16,7 +16,9 @@ export function useTerminalCopyPaste({
   encoderRef,
   writeFn,
 }: UseTerminalCopyPasteOptions) {
-  const hasSelectionRef = useRef(false);
+  const hasSelection = useCallback(() => {
+    return (terminalRef.current?.getSelection()?.length ?? 0) > 0;
+  }, [terminalRef]);
 
   const copySelection = useCallback(() => {
     const terminal = terminalRef.current;
@@ -44,17 +46,6 @@ export function useTerminalCopyPaste({
   }, [sessionIdRef, encoderRef, writeFn]);
 
   useEffect(() => {
-    const terminal = terminalRef.current;
-    if (!terminal) return;
-
-    const onSelectionChange = terminal.onSelectionChange(() => {
-      hasSelectionRef.current = (terminal.getSelection()?.length ?? 0) > 0;
-    });
-
-    return () => onSelectionChange.dispose();
-  }, [terminalRef]);
-
-  useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
@@ -79,6 +70,6 @@ export function useTerminalCopyPaste({
   return {
     copySelection,
     pasteClipboard,
-    hasSelectionRef,
+    hasSelection,
   };
 }

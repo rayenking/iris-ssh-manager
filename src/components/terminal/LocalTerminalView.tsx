@@ -54,7 +54,7 @@ export function LocalTerminalView({
   const { updateTabStatus, setTabSessionId, activeTabId: currentActiveTabId } = useTerminalStore();
   const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer } = useSettingsStore();
 
-  const { copySelection, pasteClipboard, hasSelectionRef } = useTerminalCopyPaste({
+  const { copySelection, pasteClipboard, hasSelection } = useTerminalCopyPaste({
     terminalRef,
     containerRef,
     sessionIdRef,
@@ -63,8 +63,8 @@ export function LocalTerminalView({
   });
 
   useEffect(() => {
-    onCopyPasteReady?.({ copySelection, pasteClipboard, hasSelectionRef });
-  }, [copySelection, pasteClipboard, hasSelectionRef, onCopyPasteReady]);
+    onCopyPasteReady?.({ copySelection, pasteClipboard, hasSelection });
+  }, [copySelection, pasteClipboard, hasSelection, onCopyPasteReady]);
 
   useEffect(() => {
     statusChangeRef.current = onStatusChange
