@@ -13,6 +13,8 @@ pub async fn ssh_connect(
     pool: State<'_, SshPool>,
     connection_id: String,
     on_data: Channel<Vec<u8>>,
+    cols: Option<u32>,
+    rows: Option<u32>,
 ) -> Result<String, String> {
     let connection = ConnectionRepo::get_by_id(&db.0, &connection_id)
         .map_err(|error| error.to_string())?
@@ -36,7 +38,7 @@ pub async fn ssh_connect(
     .map_err(|error| error.to_string())?;
 
     session
-        .open_shell(80, 24)
+        .open_shell(cols.unwrap_or(80), rows.unwrap_or(24))
         .await
         .map_err(|error| error.to_string())?;
     session.start_reading(on_data).map_err(|error| error.to_string())?;

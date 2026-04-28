@@ -14,7 +14,7 @@ export function useSSH() {
   const [error, setError] = useState<string | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
 
-  const connect = useCallback(async (connectionId: string, onData: SshDataHandler) => {
+  const connect = useCallback(async (connectionId: string, onData: SshDataHandler, cols?: number, rows?: number) => {
     setConnectionState('connecting');
     setError(null);
 
@@ -22,7 +22,7 @@ export function useSSH() {
     channel.onmessage = onData;
 
     try {
-      const sessionId = await tauriApi.sshConnect(connectionId, channel);
+      const sessionId = await tauriApi.sshConnect(connectionId, channel, cols, rows);
       activeSessionIdRef.current = sessionId;
       setConnectionState('connected');
       return sessionId;

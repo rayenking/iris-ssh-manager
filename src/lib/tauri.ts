@@ -375,9 +375,9 @@ export const tauriApi = {
       ? invoke('has_credential', { connectionId })
       : Promise.resolve(false),
 
-  sshConnect: (connectionId: string, onData: Channel<number[]>): Promise<string> =>
+  sshConnect: (connectionId: string, onData: Channel<number[]>, cols?: number, rows?: number): Promise<string> =>
     isTauriRuntime()
-      ? invoke('ssh_connect', { connectionId, onData })
+      ? invoke('ssh_connect', { connectionId, onData, cols, rows })
       : Promise.reject(new Error('SSH connections are only available in the Tauri app.')),
 
   sshDisconnect: (sessionId: string): Promise<void> =>
