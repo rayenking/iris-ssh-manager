@@ -16,7 +16,7 @@ import type { TabStatus } from '../../types/terminal';
 export interface TerminalCopyPasteHandle {
   copySelection: () => void;
   pasteClipboard: () => Promise<void>;
-  hasSelectionRef: React.MutableRefObject<boolean>;
+  hasSelection: () => boolean;
 }
 
 interface Props {
@@ -68,7 +68,7 @@ export function TerminalView({
   const { updateTabStatus, setTabSessionId } = useTerminalStore();
   const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer, autoReconnect } = useSettingsStore();
 
-  const { copySelection, pasteClipboard, hasSelectionRef } = useTerminalCopyPaste({
+  const { copySelection, pasteClipboard, hasSelection } = useTerminalCopyPaste({
     terminalRef,
     containerRef,
     sessionIdRef,
@@ -77,8 +77,8 @@ export function TerminalView({
   });
 
   useEffect(() => {
-    onCopyPasteReady?.({ copySelection, pasteClipboard, hasSelectionRef });
-  }, [copySelection, pasteClipboard, hasSelectionRef, onCopyPasteReady]);
+    onCopyPasteReady?.({ copySelection, pasteClipboard, hasSelection });
+  }, [copySelection, pasteClipboard, hasSelection, onCopyPasteReady]);
 
   useEffect(() => {
     statusChangeRef.current = onStatusChange

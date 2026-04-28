@@ -137,7 +137,7 @@ export function TerminalPane({ pane }: Props) {
       onContextMenu={(event) => {
         event.preventDefault();
         setFocusedPane(pane.id);
-        setHasSelection(copyPasteRef.current?.hasSelectionRef.current ?? false);
+        setHasSelection(copyPasteRef.current?.hasSelection() ?? false);
         setContextMenu({ x: event.clientX, y: event.clientY });
       }}
       onDragOver={handlePaneDragOver}
