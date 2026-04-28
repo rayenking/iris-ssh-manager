@@ -429,8 +429,20 @@ export const tauriApi = {
   sftpRename: (sessionId: string, oldPath: string, newPath: string): Promise<void> =>
     isTauriRuntime() ? invoke('sftp_rename', { sessionId, old: oldPath, new: newPath }) : Promise.resolve(),
 
+  sftpRemoteTransfer: (sourceSessionId: string, sourcePath: string, destSessionId: string, destPath: string, onProgress: Channel<TransferProgress>): Promise<void> =>
+    isTauriRuntime() ? invoke('sftp_remote_transfer', { sourceSessionId, sourcePath, destSessionId, destPath, onProgress }) : Promise.resolve(),
+
   localListDir: (path: string): Promise<FileEntry[]> =>
     isTauriRuntime() ? invoke('local_list_dir', { path }) : Promise.resolve([]),
+
+  localDelete: (path: string): Promise<void> =>
+    isTauriRuntime() ? invoke('local_delete', { path }) : Promise.resolve(),
+
+  localRename: (oldPath: string, newPath: string): Promise<void> =>
+    isTauriRuntime() ? invoke('local_rename', { oldPath, newPath }) : Promise.resolve(),
+
+  localMkdir: (path: string): Promise<void> =>
+    isTauriRuntime() ? invoke('local_mkdir', { path }) : Promise.resolve(),
 
   createTunnel: (sessionId: string, config: TunnelConfig): Promise<string> =>
     isTauriRuntime()

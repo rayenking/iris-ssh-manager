@@ -1,10 +1,15 @@
 import { X } from 'lucide-react';
+import type { DragEvent } from 'react';
 import type { AppTab, TerminalTab as TerminalTabType } from '../../types/terminal';
 
 interface Props {
   isActive: boolean;
   onClose: () => void;
   onSelect: () => void;
+  onDragStart?: (e: DragEvent<HTMLDivElement>) => void;
+  onDragOver?: (e: DragEvent<HTMLDivElement>) => void;
+  onDrop?: (e: DragEvent<HTMLDivElement>) => void;
+  dropIndicator?: 'left' | 'right' | null;
   tab: AppTab;
 }
 
@@ -24,18 +29,24 @@ function getStatusClasses(status: TerminalTabType['status']) {
   return 'bg-[var(--color-text-muted)]';
 }
 
-export function TerminalTab({ isActive, onClose, onSelect, tab }: Props) {
+export function TerminalTab({ isActive, onClose, onSelect, onDragStart, onDragOver, onDrop, dropIndicator, tab }: Props) {
   const statusDotClass = tab.kind === 'terminal' ? getStatusClasses(tab.status) : 'bg-[var(--color-accent)]';
 
   return (
     <div
+      draggable
       onClick={onSelect}
-      className={`group flex items-center h-full min-w-32 max-w-64 px-3 border-r border-[var(--color-border)] cursor-pointer select-none transition-colors ${
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      className={`group relative flex items-center h-full min-w-32 max-w-64 px-3 border-r border-[var(--color-border)] cursor-grab active:cursor-grabbing select-none transition-colors ${
         isActive
           ? 'bg-[var(--color-bg-secondary)] border-t-2 border-t-[var(--color-accent)]'
           : 'bg-[var(--color-bg-primary)] hover:bg-[var(--color-hover)] border-t-2 border-t-transparent'
       }`}
     >
+      {dropIndicator === 'left' && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-[var(--color-accent)]" />}
+      {dropIndicator === 'right' && <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-[var(--color-accent)]" />}
       <div className="flex items-center gap-2 flex-1 min-w-0">
         <span className={`w-2 h-2 rounded-full ${statusDotClass}`} />
         <span className="text-sm truncate text-[var(--color-text-primary)]">{tab.title}</span>

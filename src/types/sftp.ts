@@ -12,7 +12,7 @@ export interface TransferProgress {
   percentage: number;
 }
 
-export type TransferDirection = 'upload' | 'download';
+export type TransferDirection = 'upload' | 'download' | 'remote-transfer';
 export type TransferStatus = 'queued' | 'active' | 'completed' | 'failed' | 'cancelled';
 
 export interface TransferJob {
@@ -24,5 +24,7 @@ export interface TransferJob {
   progress: TransferProgress;
   speedBytesPerSecond: number;
   sessionId: string;
+  sourceSessionId?: string;
+  destSessionId?: string;
   error?: string;
 }

@@ -6,7 +6,7 @@ use tauri::{State, ipc::Channel};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use uuid::Uuid;
 
-use crate::ssh::pool::{SharedSshSession, SshPool};
+use crate::ssh::pool::SshPool;
 use crate::ssh::sftp::{FileEntry, SftpSession, list_local_dir};
 
 const TRANSFER_CHUNK_SIZE: usize = 64 * 1024;
@@ -25,12 +25,7 @@ pub async fn sftp_list_dir(
     session_id: String,
     path: String,
 ) -> Result<Vec<FileEntry>, String> {
-    let session = get_session(&pool, &session_id).await?;
-    let guard = session.lock().await;
-    let sftp = SftpSession::connect(&guard)
-        .await
-        .map_err(|error| error.to_string())?;
-
+    let sftp = open_sftp(&pool, &session_id).await?;
     sftp.list_dir(&path).await.map_err(|error| error.to_string())
 }
 
@@ -42,11 +37,7 @@ pub async fn sftp_download(
     local_path: String,
     on_progress: Channel<TransferProgress>,
 ) -> Result<(), String> {
-    let session = get_session(&pool, &session_id).await?;
-    let guard = session.lock().await;
-    let sftp = SftpSession::connect(&guard)
-        .await
-        .map_err(|error| error.to_string())?;
+    let sftp = open_sftp(&pool, &session_id).await?;
 
     let file_info = sftp
         .stat(&remote_path)
@@ -75,11 +66,7 @@ pub async fn sftp_upload(
     remote_path: String,
     on_progress: Channel<TransferProgress>,
 ) -> Result<(), String> {
-    let session = get_session(&pool, &session_id).await?;
-    let guard = session.lock().await;
-    let sftp = SftpSession::connect(&guard)
-        .await
-        .map_err(|error| error.to_string())?;
+    let sftp = open_sftp(&pool, &session_id).await?;
 
     let local_metadata = tokio::fs::metadata(&local_path)
         .await
@@ -106,12 +93,7 @@ pub async fn sftp_mkdir(
     session_id: String,
     path: String,
 ) -> Result<(), String> {
-    let session = get_session(&pool, &session_id).await?;
-    let guard = session.lock().await;
-    let sftp = SftpSession::connect(&guard)
-        .await
-        .map_err(|error| error.to_string())?;
-
+    let sftp = open_sftp(&pool, &session_id).await?;
     sftp.mkdir(&path).await.map_err(|error| error.to_string())
 }
 
@@ -121,12 +103,7 @@ pub async fn sftp_delete(
     session_id: String,
     path: String,
 ) -> Result<(), String> {
-    let session = get_session(&pool, &session_id).await?;
-    let guard = session.lock().await;
-    let sftp = SftpSession::connect(&guard)
-        .await
-        .map_err(|error| error.to_string())?;
-
+    let sftp = open_sftp(&pool, &session_id).await?;
     sftp.remove(&path).await.map_err(|error| error.to_string())
 }
 
@@ -137,13 +114,43 @@ pub async fn sftp_rename(
     old: String,
     new: String,
 ) -> Result<(), String> {
-    let session = get_session(&pool, &session_id).await?;
-    let guard = session.lock().await;
-    let sftp = SftpSession::connect(&guard)
-        .await
-        .map_err(|error| error.to_string())?;
-
+    let sftp = open_sftp(&pool, &session_id).await?;
     sftp.rename(&old, &new).await.map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn local_delete(path: String) -> Result<(), String> {
+    let resolved = resolve_local_path(&path)?;
+    let metadata = tokio::fs::metadata(&resolved)
+        .await
+        .map_err(|e| format!("failed to stat {}: {e}", resolved.display()))?;
+
+    if metadata.is_dir() {
+        tokio::fs::remove_dir_all(&resolved)
+            .await
+            .map_err(|e| format!("failed to delete directory {}: {e}", resolved.display()))
+    } else {
+        tokio::fs::remove_file(&resolved)
+            .await
+            .map_err(|e| format!("failed to delete file {}: {e}", resolved.display()))
+    }
+}
+
+#[tauri::command]
+pub async fn local_rename(old_path: String, new_path: String) -> Result<(), String> {
+    let old = resolve_local_path(&old_path)?;
+    let new = resolve_local_path(&new_path)?;
+    tokio::fs::rename(&old, &new)
+        .await
+        .map_err(|e| format!("failed to rename {} to {}: {e}", old.display(), new.display()))
+}
+
+#[tauri::command]
+pub async fn local_mkdir(path: String) -> Result<(), String> {
+    let resolved = resolve_local_path(&path)?;
+    tokio::fs::create_dir_all(&resolved)
+        .await
+        .map_err(|e| format!("failed to create directory {}: {e}", resolved.display()))
 }
 
 #[tauri::command]
@@ -154,15 +161,57 @@ pub async fn local_list_dir(path: String) -> Result<Vec<FileEntry>, String> {
         .map_err(|error| error.to_string())
 }
 
-async fn get_session(
+#[tauri::command]
+pub async fn sftp_remote_transfer(
+    pool: State<'_, SshPool>,
+    source_session_id: String,
+    source_path: String,
+    dest_session_id: String,
+    dest_path: String,
+    on_progress: Channel<TransferProgress>,
+) -> Result<(), String> {
+    let src_sftp = open_sftp(&pool, &source_session_id)
+        .await
+        .map_err(|e| format!("source SFTP ({source_session_id}): {e}"))?;
+    let dst_sftp = open_sftp(&pool, &dest_session_id)
+        .await
+        .map_err(|e| format!("dest SFTP ({dest_session_id}): {e}"))?;
+
+    let file_info = src_sftp
+        .stat(&source_path)
+        .await
+        .map_err(|e| format!("stat source {source_path}: {e}"))?;
+    let total_bytes = file_info.size;
+
+    let mut reader = src_sftp
+        .open_reader(&source_path)
+        .await
+        .map_err(|e| format!("open source {source_path}: {e}"))?;
+    let mut writer = dst_sftp
+        .open_writer(&dest_path)
+        .await
+        .map_err(|e| format!("open dest {dest_path}: {e}"))?;
+
+    copy_with_progress(&mut reader, &mut writer, total_bytes, on_progress)
+        .await
+        .map_err(|e| format!("copy {source_path} -> {dest_path}: {e}"))
+}
+
+async fn open_sftp(
     pool: &State<'_, SshPool>,
     session_id: &str,
-) -> Result<SharedSshSession, String> {
+) -> Result<SftpSession, String> {
     let session_id = parse_session_id(session_id)?;
-    pool.0
+    let session = pool.0
         .get(&session_id)
         .await
-        .ok_or_else(|| format!("ssh session not found: {session_id}"))
+        .ok_or_else(|| format!("ssh session not found: {session_id}"))?;
+    let guard = session.lock().await;
+    let sftp = SftpSession::connect(&guard)
+        .await
+        .map_err(|error| error.to_string())?;
+    drop(guard);
+    Ok(sftp)
 }
 
 fn parse_session_id(session_id: &str) -> Result<Uuid, String> {

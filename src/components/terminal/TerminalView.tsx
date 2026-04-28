@@ -50,6 +50,8 @@ export function TerminalView({
   const encoderRef = useRef(new TextEncoder());
   const reconnectAttemptRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastCwdRef = useRef<string | null>(null);
+  const isReconnectRef = useRef(false);
   const statusChangeRef = useRef<(status: TabStatus) => void>(() => {});
   const sessionChangeRef = useRef<(sessionId?: string) => void>(() => {});
   const [tunnelPanelOpen, setTunnelPanelOpen] = useState(false);
@@ -113,11 +115,34 @@ export function TerminalView({
       fitAddon.fit();
     });
 
+    let inputBuffer = '';
+
     const handleTerminalData = terminal.onData((value) => {
       const sessionId = sessionIdRef.current;
 
       if (!sessionId) {
         return;
+      }
+
+      if (value === '\r' || value === '\n') {
+        const trimmed = inputBuffer.trim();
+        const cdMatch = trimmed.match(/^cd\s+(.+)/);
+        if (cdMatch) {
+          const target = cdMatch[1].replace(/^~/, '$HOME').replace(/["']/g, '');
+          if (target.startsWith('/')) {
+            lastCwdRef.current = target;
+          } else if (target === '-') {
+          } else if (lastCwdRef.current) {
+            lastCwdRef.current = lastCwdRef.current.replace(/\/$/, '') + '/' + target;
+          }
+        } else if (trimmed === 'cd') {
+          lastCwdRef.current = null;
+        }
+        inputBuffer = '';
+      } else if (value === '\x7f') {
+        inputBuffer = inputBuffer.slice(0, -1);
+      } else if (value.length === 1 && value >= ' ') {
+        inputBuffer += value;
       }
 
       const data = Array.from(encoderRef.current.encode(value));
@@ -259,7 +284,14 @@ export function TerminalView({
 
     try {
       const sessionId = await connect(connectionId, (data) => {
-        terminalRef.current?.write(new Uint8Array(data));
+        const bytes = new Uint8Array(data);
+        terminalRef.current?.write(bytes);
+
+        const text = new TextDecoder().decode(bytes);
+        const osc7Match = text.match(/\x1b\]7;file:\/\/[^/]*(\/[^\x07\x1b]*)/);
+        if (osc7Match?.[1]) {
+          lastCwdRef.current = decodeURIComponent(osc7Match[1]);
+        }
       });
 
       sessionIdRef.current = sessionId;
@@ -274,10 +306,28 @@ export function TerminalView({
         f.fit();
         void resize(sessionIdRef.current, t.cols, t.rows).catch(() => {});
       });
+
+      const restoreCwd = isReconnectRef.current && lastCwdRef.current;
+      const encoder = encoderRef.current;
+
+      if (isReconnectRef.current) {
+        setTimeout(() => {
+          const sid = sessionIdRef.current;
+          if (!sid) return;
+
+          let cmd = ' PROMPT_COMMAND=\'printf "\\e]7;file://%s%s\\a" "${HOSTNAME:-localhost}" "$(pwd)"\'';
+          if (lastCwdRef.current) {
+            cmd += `; cd ${shellEscape(lastCwdRef.current)} 2>/dev/null`;
+          }
+          cmd += '; clear\n';
+          void write(sid, Array.from(encoder.encode(cmd))).catch(() => {});
+        }, 500);
+      }
+
     } catch (connectError) {
       console.error('Failed to connect SSH terminal:', connectError);
     }
-  }, [connect, connectionId, emitSessionChange, emitStatusChange, resize]);
+  }, [connect, connectionId, emitSessionChange, emitStatusChange, resize, write]);
 
   const handleReconnect = useCallback(() => {
     const oldSessionId = sessionIdRef.current;
@@ -286,6 +336,7 @@ export function TerminalView({
     if (oldSessionId) {
       void disconnect(oldSessionId).catch(() => {});
     }
+    isReconnectRef.current = true;
     terminalRef.current?.write('\r\n\x1b[33mReconnecting...\x1b[0m\r\n');
     void doConnect();
   }, [disconnect, doConnect, emitSessionChange]);
@@ -420,4 +471,8 @@ export function TerminalView({
       {tunnelPanelOpen && <TunnelManager sessionId={sessionIdRef.current} />}
     </div>
   );
+}
+
+function shellEscape(s: string): string {
+  return "'" + s.replace(/'/g, "'\\''") + "'";
 }
