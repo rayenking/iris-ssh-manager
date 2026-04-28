@@ -1,19 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
+import type { DragEvent } from 'react';
 import type { Connection } from '../../types/connection';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useConnectionStore } from '../../stores/connectionStore';
 import { tauriApi } from '../../lib/tauri';
 import { Copy, Edit, Trash2 } from 'lucide-react';
 
+export const CONNECTION_DRAG_TYPE = 'application/x-iris-connection';
+
 interface Props {
   connection: Connection;
+  index: number;
+  onReorder?: (fromIndex: number, toIndex: number) => void;
 }
 
-export function ConnectionCard({ connection }: Props) {
+export function ConnectionCard({ connection, index, onReorder }: Props) {
   const { openTab } = useTerminalStore();
   const { selectedId, setSelected, fetchConnections, deleteConnection } = useConnectionStore();
   const isSelected = selectedId === connection.id;
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<'top' | 'bottom' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const handleDoubleClick = () => {
@@ -23,6 +29,41 @@ export function ConnectionCard({ connection }: Props) {
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleDragStart = (e: DragEvent<HTMLDivElement>) => {
+    e.dataTransfer.setData(CONNECTION_DRAG_TYPE, JSON.stringify({ id: connection.id, name: connection.name, index }));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes(CONNECTION_DRAG_TYPE)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    setDropIndicator(e.clientY < midY ? 'top' : 'bottom');
+  };
+
+  const handleDragLeave = () => {
+    setDropIndicator(null);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDropIndicator(null);
+    const raw = e.dataTransfer.getData(CONNECTION_DRAG_TYPE);
+    if (!raw) return;
+    try {
+      const source = JSON.parse(raw) as { id: string; name: string; index: number };
+      if (source.id === connection.id) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      const insertBefore = e.clientY < midY;
+      let toIndex = insertBefore ? index : index + 1;
+      if (source.index < toIndex) toIndex -= 1;
+      if (source.index !== toIndex) onReorder?.(source.index, toIndex);
+    } catch { /* ignore */ }
   };
 
   useEffect(() => {
@@ -67,12 +108,17 @@ export function ConnectionCard({ connection }: Props) {
   return (
     <>
       <div 
+        draggable
         onClick={() => setSelected(connection.id)}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         className={`relative flex items-center p-2 mx-2 my-1 cursor-pointer rounded transition-colors ${
           isSelected ? 'bg-[var(--color-hover)]' : 'hover:bg-[var(--color-bg-tertiary)]'
-        }`}
+        } ${dropIndicator === 'top' ? 'border-t-2 border-t-[var(--color-accent)]' : ''} ${dropIndicator === 'bottom' ? 'border-b-2 border-b-[var(--color-accent)]' : ''}`}
       >
         {connection.colorTag && (
           <div 
