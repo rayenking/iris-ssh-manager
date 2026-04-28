@@ -1,12 +1,15 @@
 import { create } from 'zustand';
-import type { AppTab, TabStatus, TerminalTab } from '../types/terminal';
+import type { AppTab, LocalTerminalTab, TabStatus, TerminalTab } from '../types/terminal';
 import { getPrimaryPaneId, useSplitStore } from './splitStore';
+
+type TerminalLikeTab = TerminalTab | LocalTerminalTab;
 
 interface TerminalState {
   tabs: AppTab[];
   activeTabId: string | null;
 
   openTab: (connectionId: string, title: string) => void;
+  openLocalTab: () => void;
   openFileBrowserTab: (terminalTabId: string, connectionId: string, title: string) => void;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
@@ -15,8 +18,8 @@ interface TerminalState {
   setTabSessionId: (id: string, sessionId?: string) => void;
 }
 
-function isTerminalTab(tab: AppTab): tab is TerminalTab {
-  return tab.kind === 'terminal';
+function isTerminalTab(tab: AppTab): tab is TerminalLikeTab {
+  return tab.kind === 'terminal' || tab.kind === 'local-terminal';
 }
 
 export const useTerminalStore = create<TerminalState>((set) => ({
@@ -33,6 +36,24 @@ export const useTerminalStore = create<TerminalState>((set) => ({
     };
 
     useSplitStore.getState().initSplit(newTab.id, connectionId);
+    useSplitStore.getState().setFocusedPane(newTab.id);
+
+    set((state) => ({
+      tabs: [...state.tabs, newTab],
+      activeTabId: newTab.id,
+    }));
+  },
+
+  openLocalTab: () => {
+    const newTab: LocalTerminalTab = {
+      id: crypto.randomUUID(),
+      connectionId: 'local',
+      title: 'Local Terminal',
+      kind: 'local-terminal',
+      status: 'connecting',
+    };
+
+    useSplitStore.getState().initSplit(newTab.id, 'local');
     useSplitStore.getState().setFocusedPane(newTab.id);
 
     set((state) => ({
@@ -72,7 +93,7 @@ export const useTerminalStore = create<TerminalState>((set) => ({
       const tabsToRemove = new Set<string>([id]);
       const splitStore = useSplitStore.getState();
 
-      if (targetTab?.kind === 'terminal') {
+      if (targetTab && isTerminalTab(targetTab)) {
         splitStore.removeSplit(id);
 
         state.tabs.forEach((tab) => {
@@ -93,7 +114,7 @@ export const useTerminalStore = create<TerminalState>((set) => ({
       if (nextActiveTabId) {
         const nextActiveTab = newTabs.find((tab) => tab.id === nextActiveTabId);
 
-        if (nextActiveTab?.kind === 'terminal') {
+        if (nextActiveTab && isTerminalTab(nextActiveTab)) {
           const nextTree = splitStore.getSplitTree(nextActiveTab.id);
           splitStore.setFocusedPane(nextTree ? getPrimaryPaneId(nextTree) : nextActiveTab.id);
         }
@@ -110,7 +131,7 @@ export const useTerminalStore = create<TerminalState>((set) => ({
     const { tabs } = useTerminalStore.getState();
     const targetTab = tabs.find((tab) => tab.id === id);
 
-    if (targetTab?.kind === 'terminal') {
+    if (targetTab && isTerminalTab(targetTab)) {
       const splitStore = useSplitStore.getState();
       const splitTree = splitStore.getSplitTree(id);
       splitStore.setFocusedPane(splitTree ? getPrimaryPaneId(splitTree) : id);

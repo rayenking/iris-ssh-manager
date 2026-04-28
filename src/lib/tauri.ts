@@ -395,6 +395,26 @@ export const tauriApi = {
       ? invoke('ssh_resize', { sessionId, cols, rows })
       : Promise.resolve(),
 
+  localShellOpen: (channel: Channel<number[]>, cols: number, rows: number): Promise<string> =>
+    isTauriRuntime()
+      ? invoke('local_shell_open', { onData: channel, cols, rows })
+      : Promise.reject(new Error('Local terminal is only available in the Tauri app.')),
+
+  localShellWrite: (sessionId: string, data: number[]): Promise<void> =>
+    isTauriRuntime()
+      ? invoke('local_shell_write', { sessionId, data })
+      : Promise.reject(new Error('Local terminal is only available in the Tauri app.')),
+
+  localShellResize: (sessionId: string, cols: number, rows: number): Promise<void> =>
+    isTauriRuntime()
+      ? invoke('local_shell_resize', { sessionId, cols, rows })
+      : Promise.reject(new Error('Local terminal is only available in the Tauri app.')),
+
+  localShellDisconnect: (sessionId: string): Promise<void> =>
+    isTauriRuntime()
+      ? invoke('local_shell_disconnect', { sessionId })
+      : Promise.resolve(),
+
   sftpListDir: (sessionId: string, path: string): Promise<FileEntry[]> =>
     isTauriRuntime()
       ? invoke('sftp_list_dir', { sessionId, path })

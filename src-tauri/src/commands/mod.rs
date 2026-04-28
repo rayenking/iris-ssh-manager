@@ -1,6 +1,7 @@
 pub mod config;
 pub mod connection;
 pub mod keychain;
+pub mod local_terminal;
 pub mod tunnel;
 pub mod sftp;
 pub mod terminal;

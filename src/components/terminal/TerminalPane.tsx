@@ -5,6 +5,7 @@ import { useSplitStore, getPrimaryPaneId, type PaneSplitDirection } from '../../
 import type { SplitLeaf } from '../../types/split';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { TerminalView } from './TerminalView';
+import { LocalTerminalView } from './LocalTerminalView';
 import { TAB_DRAG_TYPE } from '../layout/TabBar';
 
 interface Props {
@@ -97,7 +98,7 @@ export function TerminalPane({ pane }: Props) {
     if (!direction) return;
 
     const sourceTab = useTerminalStore.getState().tabs.find((t) => t.id === sourceTabId);
-    if (!sourceTab || sourceTab.kind !== 'terminal') return;
+    if (!sourceTab || (sourceTab.kind !== 'terminal' && sourceTab.kind !== 'local-terminal')) return;
 
     useSplitStore.getState().splitPaneWithConnection(pane.tabId, pane.id, direction, sourceTab.connectionId);
   }, [pane.id, pane.tabId]);
@@ -137,15 +138,26 @@ export function TerminalPane({ pane }: Props) {
           }`} />
         </div>
       )}
-      <TerminalView
-        connectionId={pane.connectionId}
-        tabId={pane.tabId}
-        paneId={pane.id}
-        isFocusedPane={isFocused}
-        reportTabState={isPrimaryPane}
-        onStatusChange={isPrimaryPane ? (status) => updateTabStatus(pane.tabId, status) : undefined}
-        onSessionChange={isPrimaryPane ? (sessionId) => setTabSessionId(pane.tabId, sessionId) : undefined}
-      />
+      {pane.connectionId === 'local' ? (
+        <LocalTerminalView
+          tabId={pane.tabId}
+          paneId={pane.id}
+          isFocusedPane={isFocused}
+          reportTabState={isPrimaryPane}
+          onStatusChange={isPrimaryPane ? (status) => updateTabStatus(pane.tabId, status) : undefined}
+          onSessionChange={isPrimaryPane ? (sessionId) => setTabSessionId(pane.tabId, sessionId) : undefined}
+        />
+      ) : (
+        <TerminalView
+          connectionId={pane.connectionId}
+          tabId={pane.tabId}
+          paneId={pane.id}
+          isFocusedPane={isFocused}
+          reportTabState={isPrimaryPane}
+          onStatusChange={isPrimaryPane ? (status) => updateTabStatus(pane.tabId, status) : undefined}
+          onSessionChange={isPrimaryPane ? (sessionId) => setTabSessionId(pane.tabId, sessionId) : undefined}
+        />
+      )}
 
       <button
         type="button"

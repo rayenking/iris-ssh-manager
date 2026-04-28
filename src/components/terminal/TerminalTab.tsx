@@ -30,7 +30,7 @@ function getStatusClasses(status: TerminalTabType['status']) {
 }
 
 export function TerminalTab({ isActive, onClose, onSelect, onDragStart, onDragOver, onDrop, dropIndicator, tab }: Props) {
-  const statusDotClass = tab.kind === 'terminal' ? getStatusClasses(tab.status) : 'bg-[var(--color-accent)]';
+  const statusDotClass = tab.kind === 'files' ? 'bg-[var(--color-accent)]' : getStatusClasses(tab.status);
 
   return (
     <div

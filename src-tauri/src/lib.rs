@@ -24,6 +24,7 @@ pub fn run() {
 
             app.manage(db::DbState(std::sync::Mutex::new(db_connection)));
             app.manage(ssh::pool::SshPool(ssh::ConnectionPool::new()));
+            app.manage(commands::local_terminal::LocalShellPool::new());
 
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -51,6 +52,10 @@ pub fn run() {
             commands::terminal::ssh_disconnect,
             commands::terminal::ssh_write,
             commands::terminal::ssh_resize,
+            commands::local_terminal::local_shell_open,
+            commands::local_terminal::local_shell_write,
+            commands::local_terminal::local_shell_resize,
+            commands::local_terminal::local_shell_disconnect,
             commands::tunnel::create_tunnel,
             commands::tunnel::stop_tunnel,
             commands::tunnel::list_tunnels,
@@ -60,7 +65,7 @@ pub fn run() {
             commands::sftp::sftp_mkdir,
             commands::sftp::sftp_delete,
             commands::sftp::sftp_rename,
-                commands::sftp::sftp_remote_transfer,
+            commands::sftp::sftp_remote_transfer,
             commands::sftp::local_list_dir,
             commands::sftp::local_delete,
             commands::sftp::local_rename,

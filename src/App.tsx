@@ -58,6 +58,12 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const handleLocalTerminal = () => useTerminalStore.getState().openLocalTab();
+    registerShortcut('local-terminal', handleLocalTerminal);
+    return () => unregisterShortcut('local-terminal');
+  }, []);
+
+  useEffect(() => {
     registerShortcut('toggle-snippets', toggleSnippets);
 
     return () => unregisterShortcut('toggle-snippets');
@@ -155,7 +161,7 @@ function App() {
                 key={tab.id}
                 className={`absolute inset-0 flex flex-col ${activeTabId === tab.id ? '' : 'hidden'}`}
               >
-                {tab.kind === 'terminal' ? (
+                {tab.kind === 'terminal' || tab.kind === 'local-terminal' ? (
                   splitTrees[tab.id] ? <SplitContainer node={splitTrees[tab.id]} tabId={tab.id} /> : null
                 ) : (() => {
                   const terminalTab = tabs.find(
