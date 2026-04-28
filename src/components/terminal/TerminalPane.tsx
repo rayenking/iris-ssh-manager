@@ -7,6 +7,7 @@ import { useTerminalStore } from '../../stores/terminalStore';
 import { TerminalView } from './TerminalView';
 import { LocalTerminalView } from './LocalTerminalView';
 import { TAB_DRAG_TYPE } from '../layout/TabBar';
+import { CONNECTION_DRAG_TYPE } from '../connections/ConnectionCard';
 
 interface Props {
   pane: SplitLeaf;
@@ -75,7 +76,9 @@ export function TerminalPane({ pane }: Props) {
   }, [contextMenu]);
 
   const handlePaneDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
-    if (!e.dataTransfer.types.includes(TAB_DRAG_TYPE)) return;
+    const hasTab = e.dataTransfer.types.includes(TAB_DRAG_TYPE);
+    const hasConnection = e.dataTransfer.types.includes(CONNECTION_DRAG_TYPE);
+    if (!hasTab && !hasConnection) return;
     e.preventDefault();
     e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
@@ -90,17 +93,26 @@ export function TerminalPane({ pane }: Props) {
   const handlePaneDrop = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    const sourceTabId = e.dataTransfer.getData(TAB_DRAG_TYPE);
     setDropZone(null);
-    if (!sourceTabId) return;
 
     const direction = getDropDirection(e);
     if (!direction) return;
 
-    const sourceTab = useTerminalStore.getState().tabs.find((t) => t.id === sourceTabId);
-    if (!sourceTab || (sourceTab.kind !== 'terminal' && sourceTab.kind !== 'local-terminal')) return;
+    const sourceTabId = e.dataTransfer.getData(TAB_DRAG_TYPE);
+    if (sourceTabId) {
+      const sourceTab = useTerminalStore.getState().tabs.find((t) => t.id === sourceTabId);
+      if (!sourceTab || (sourceTab.kind !== 'terminal' && sourceTab.kind !== 'local-terminal')) return;
+      useSplitStore.getState().splitPaneWithConnection(pane.tabId, pane.id, direction, sourceTab.connectionId);
+      return;
+    }
 
-    useSplitStore.getState().splitPaneWithConnection(pane.tabId, pane.id, direction, sourceTab.connectionId);
+    const connectionRaw = e.dataTransfer.getData(CONNECTION_DRAG_TYPE);
+    if (connectionRaw) {
+      try {
+        const { id } = JSON.parse(connectionRaw) as { id: string; name: string };
+        useSplitStore.getState().splitPaneWithConnection(pane.tabId, pane.id, direction, id);
+      } catch { /* ignore */ }
+    }
   }, [pane.id, pane.tabId]);
 
   const handleSplit = (direction: PaneSplitDirection) => {
