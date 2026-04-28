@@ -68,7 +68,7 @@ export function TerminalView({
   const { updateTabStatus, setTabSessionId } = useTerminalStore();
   const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer, autoReconnect } = useSettingsStore();
 
-  const { copySelection, pasteClipboard, hasSelection, attachKeyHandler } = useTerminalCopyPaste({
+  const { copySelection, pasteClipboard, hasSelection, attach: attachCopyPaste } = useTerminalCopyPaste({
     terminalRef,
     sessionIdRef,
     encoderRef,
@@ -122,7 +122,7 @@ export function TerminalView({
     terminal.loadAddon(fitAddon);
     terminal.loadAddon(searchAddon);
     terminal.open(terminalHost);
-    attachKeyHandler(terminal);
+    attachCopyPaste(terminal);
 
     try {
       terminal.loadAddon(new WebglAddon());
@@ -246,7 +246,7 @@ export function TerminalView({
       terminalRef.current = null;
       fitAddonRef.current = null;
     };
-  }, [attachKeyHandler, resize, write]);
+  }, [attachCopyPaste, resize, write]);
 
   useEffect(() => {
     const terminal = terminalRef.current;
