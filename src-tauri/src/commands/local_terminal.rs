@@ -12,35 +12,44 @@ use tokio::task::JoinHandle;
 use uuid::Uuid;
 
 const READ_BATCH_LIMIT: usize = 8 * 1024;
+const READ_CHANNEL_CAPACITY: usize = 128;
+const MAX_WRITE_BYTES: usize = 64 * 1024;
 
 type SharedLocalShellSession = Arc<Mutex<LocalShellSession>>;
 
 pub struct LocalShellSession {
     master: Arc<Mutex<Box<dyn MasterPty + Send>>>,
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
-    child: Arc<Mutex<Box<dyn Child + Send>>>,
+    child: Arc<Mutex<Box<dyn Child + Send + Sync>>>,
     reader_task: Option<JoinHandle<()>>,
     stream_task: Option<JoinHandle<()>>,
+    exit_task: Option<JoinHandle<()>>,
 }
 
 impl LocalShellSession {
     fn new(
         master: Box<dyn MasterPty + Send>,
         writer: Box<dyn Write + Send>,
-        child: Box<dyn Child + Send>,
+        child: Arc<Mutex<Box<dyn Child + Send + Sync>>>,
         reader_task: JoinHandle<()>,
         stream_task: JoinHandle<()>,
+        exit_task: JoinHandle<()>,
     ) -> Self {
         Self {
             master: Arc::new(Mutex::new(master)),
             writer: Arc::new(Mutex::new(writer)),
-            child: Arc::new(Mutex::new(child)),
+            child,
             reader_task: Some(reader_task),
             stream_task: Some(stream_task),
+            exit_task: Some(exit_task),
         }
     }
 
     async fn write(&self, data: &[u8]) -> Result<()> {
+        if data.len() > MAX_WRITE_BYTES {
+            return Err(anyhow::anyhow!("local shell write exceeds {} bytes", MAX_WRITE_BYTES));
+        }
+
         let mut writer = self.writer.lock().await;
         writer
             .write_all(data)
@@ -67,11 +76,13 @@ impl LocalShellSession {
             task.abort();
         }
 
-        self.child
-            .lock()
-            .await
-            .kill()
-            .context("failed to kill local shell process")?;
+        if let Some(task) = self.exit_task.take() {
+            task.abort();
+        }
+
+        if let Err(error) = self.child.lock().await.kill() {
+            log::debug!("local shell kill during disconnect returned: {error}");
+        }
 
         Ok(())
     }
@@ -87,10 +98,13 @@ impl Drop for LocalShellSession {
             task.abort();
         }
 
-        let child = Arc::clone(&self.child);
-        tokio::spawn(async move {
-            let _ = child.lock().await.kill();
-        });
+        if let Some(task) = self.exit_task.take() {
+            task.abort();
+        }
+
+        if let Ok(mut child) = self.child.try_lock() {
+            let _ = child.kill();
+        }
     }
 }
 
@@ -106,13 +120,11 @@ impl LocalShellPool {
         }
     }
 
-    pub async fn add(&self, session: LocalShellSession) -> Uuid {
-        let id = Uuid::new_v4();
+    pub async fn add(&self, id: Uuid, session: LocalShellSession) {
         self.sessions
             .write()
             .await
             .insert(id, Arc::new(Mutex::new(session)));
-        id
     }
 
     pub async fn get(&self, id: &Uuid) -> Option<SharedLocalShellSession> {
@@ -153,7 +165,7 @@ pub async fn local_shell_open(
         .take_writer()
         .map_err(|error| error.to_string())?;
 
-    let (output_tx, mut output_rx) = mpsc::unbounded_channel::<Vec<u8>>();
+    let (output_tx, mut output_rx) = mpsc::channel::<Vec<u8>>(READ_CHANNEL_CAPACITY);
     let reader_task = tokio::task::spawn_blocking(move || {
         let mut reader = reader;
         let mut buffer = [0_u8; 4096];
@@ -162,7 +174,7 @@ pub async fn local_shell_open(
             match reader.read(&mut buffer) {
                 Ok(0) => break,
                 Ok(read_count) => {
-                    if output_tx.send(buffer[..read_count].to_vec()).is_err() {
+                    if output_tx.blocking_send(buffer[..read_count].to_vec()).is_err() {
                         break;
                     }
                 }
@@ -202,10 +214,21 @@ pub async fn local_shell_open(
         if !buffer.is_empty() {
             let _ = on_data.send(buffer);
         }
+
+        let _ = on_data.send(Vec::new());
     });
 
-    let session = LocalShellSession::new(pair.master, writer, child, reader_task, stream_task);
-    let session_id = pool.add(session).await;
+    let child = Arc::new(Mutex::new(child));
+    let session_id = Uuid::new_v4();
+    let sessions = Arc::clone(&pool.sessions);
+    let exit_child = Arc::clone(&child);
+    let exit_task = tokio::task::spawn_blocking(move || {
+        let _ = exit_child.blocking_lock().wait();
+        sessions.blocking_write().remove(&session_id);
+    });
+
+    let session = LocalShellSession::new(pair.master, writer, child, reader_task, stream_task, exit_task);
+    pool.add(session_id, session).await;
 
     Ok(session_id.to_string())
 }
