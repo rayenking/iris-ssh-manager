@@ -172,8 +172,8 @@ export function TerminalView({
       });
     });
 
-    let lastCols = 0;
-    let lastRows = 0;
+    let lastCols = terminal.cols;
+    let lastRows = terminal.rows;
     let disposed = false;
     let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
