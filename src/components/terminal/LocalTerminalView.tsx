@@ -6,8 +6,10 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
 import { useCallback, useEffect, useRef } from 'react';
 import { useLocalShell } from '../../hooks/useLocalShell';
+import { useTerminalCopyPaste } from '../../hooks/useTerminalCopyPaste';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { TerminalContextMenu } from './TerminalContextMenu';
 import type { TabStatus } from '../../types/terminal';
 
 interface Props {
@@ -49,6 +51,14 @@ export function LocalTerminalView({
   const { open, close, write, resize, connectionState, error } = useLocalShell();
   const { updateTabStatus, setTabSessionId, activeTabId: currentActiveTabId } = useTerminalStore();
   const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer } = useSettingsStore();
+
+  const { contextMenu, closeContextMenu, copySelection, pasteClipboard, hasSelectionRef } = useTerminalCopyPaste({
+    terminalRef,
+    containerRef,
+    sessionIdRef,
+    encoderRef,
+    writeFn: write,
+  });
 
   useEffect(() => {
     statusChangeRef.current = onStatusChange
@@ -335,6 +345,17 @@ export function LocalTerminalView({
           </div>
         )}
       </div>
+
+      {contextMenu.visible && (
+        <TerminalContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          hasSelection={hasSelectionRef.current}
+          onCopy={copySelection}
+          onPaste={() => void pasteClipboard()}
+          onClose={closeContextMenu}
+        />
+      )}
     </div>
   );
 }
