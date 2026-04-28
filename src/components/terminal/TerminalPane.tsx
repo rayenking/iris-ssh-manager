@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
-import { PanelBottom, PanelLeft, PanelRight, PanelTop, X } from 'lucide-react';
+import { Copy, ClipboardPaste, PanelBottom, PanelLeft, PanelRight, PanelTop, X } from 'lucide-react';
 import { useSplitStore, getPrimaryPaneId, type PaneSplitDirection } from '../../stores/splitStore';
 import type { SplitLeaf } from '../../types/split';
 import { useTerminalStore } from '../../stores/terminalStore';
-import { TerminalView } from './TerminalView';
+import { TerminalView, type TerminalCopyPasteHandle } from './TerminalView';
 import { LocalTerminalView } from './LocalTerminalView';
 import { TAB_DRAG_TYPE } from '../layout/TabBar';
 import { CONNECTION_DRAG_TYPE } from '../connections/ConnectionCard';
@@ -41,6 +41,11 @@ export function TerminalPane({ pane }: Props) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [dropZone, setDropZone] = useState<PaneSplitDirection | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const copyPasteRef = useRef<TerminalCopyPasteHandle | null>(null);
+
+  const handleCopyPasteReady = useCallback((handle: TerminalCopyPasteHandle) => {
+    copyPasteRef.current = handle;
+  }, []);
   const focusedPaneId = useSplitStore((state) => state.focusedPaneId);
   const splitTree = useSplitStore((state) => state.splitTrees[pane.tabId] ?? null);
   const setFocusedPane = useSplitStore((state) => state.setFocusedPane);
@@ -158,6 +163,7 @@ export function TerminalPane({ pane }: Props) {
           reportTabState={isPrimaryPane}
           onStatusChange={isPrimaryPane ? (status) => updateTabStatus(pane.tabId, status) : undefined}
           onSessionChange={isPrimaryPane ? (sessionId) => setTabSessionId(pane.tabId, sessionId) : undefined}
+          onCopyPasteReady={handleCopyPasteReady}
         />
       ) : (
         <TerminalView
@@ -168,6 +174,7 @@ export function TerminalPane({ pane }: Props) {
           reportTabState={isPrimaryPane}
           onStatusChange={isPrimaryPane ? (status) => updateTabStatus(pane.tabId, status) : undefined}
           onSessionChange={isPrimaryPane ? (sessionId) => setTabSessionId(pane.tabId, sessionId) : undefined}
+          onCopyPasteReady={handleCopyPasteReady}
         />
       )}
 
@@ -186,9 +193,29 @@ export function TerminalPane({ pane }: Props) {
       {contextMenu && (
         <div
           ref={menuRef}
-          className="fixed z-50 w-48 rounded border border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
+          className="fixed z-50 w-52 rounded border border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
+          <button
+            type="button"
+            disabled={!copyPasteRef.current?.hasSelectionRef.current}
+            onClick={() => { copyPasteRef.current?.copySelection(); setContextMenu(null); }}
+            className="flex w-full items-center px-4 py-2 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] disabled:opacity-40 disabled:cursor-default disabled:hover:bg-transparent"
+          >
+            <Copy className="mr-2 h-4 w-4" />
+            <span className="flex-1">Copy</span>
+            <span className="text-xs text-[var(--color-text-muted)]">Ctrl+Shift+C</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { void copyPasteRef.current?.pasteClipboard(); setContextMenu(null); }}
+            className="flex w-full items-center px-4 py-2 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)]"
+          >
+            <ClipboardPaste className="mr-2 h-4 w-4" />
+            <span className="flex-1">Paste</span>
+            <span className="text-xs text-[var(--color-text-muted)]">Ctrl+Shift+V</span>
+          </button>
+          <div className="my-1 border-t border-[var(--color-border)]" />
           {splitItems.map(({ direction, label, Icon }) => (
             <button
               key={direction}

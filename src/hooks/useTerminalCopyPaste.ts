@@ -1,11 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { Terminal } from '@xterm/xterm';
-
-interface ContextMenuState {
-  visible: boolean;
-  x: number;
-  y: number;
-}
 
 interface UseTerminalCopyPasteOptions {
   terminalRef: React.MutableRefObject<Terminal | null>;
@@ -22,7 +16,6 @@ export function useTerminalCopyPaste({
   encoderRef,
   writeFn,
 }: UseTerminalCopyPasteOptions) {
-  const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0 });
   const hasSelectionRef = useRef(false);
 
   const copySelection = useCallback(() => {
@@ -50,10 +43,6 @@ export function useTerminalCopyPaste({
     }
   }, [sessionIdRef, encoderRef, writeFn]);
 
-  const closeContextMenu = useCallback(() => {
-    setContextMenu({ visible: false, x: 0, y: 0 });
-  }, []);
-
   useEffect(() => {
     const terminal = terminalRef.current;
     if (!terminal) return;
@@ -64,25 +53,6 @@ export function useTerminalCopyPaste({
 
     return () => onSelectionChange.dispose();
   }, [terminalRef]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      setContextMenu({
-        visible: true,
-        x: e.clientX,
-        y: e.clientY,
-      });
-    };
-
-    container.addEventListener('contextmenu', handleContextMenu);
-    return () => container.removeEventListener('contextmenu', handleContextMenu);
-  }, [containerRef]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -106,21 +76,7 @@ export function useTerminalCopyPaste({
     return () => container.removeEventListener('keydown', handleKeyDown, true);
   }, [containerRef, copySelection, pasteClipboard]);
 
-  useEffect(() => {
-    if (!contextMenu.visible) return;
-
-    const handleClick = () => closeContextMenu();
-    window.addEventListener('click', handleClick);
-    window.addEventListener('contextmenu', handleClick);
-    return () => {
-      window.removeEventListener('click', handleClick);
-      window.removeEventListener('contextmenu', handleClick);
-    };
-  }, [contextMenu.visible, closeContextMenu]);
-
   return {
-    contextMenu,
-    closeContextMenu,
     copySelection,
     pasteClipboard,
     hasSelectionRef,

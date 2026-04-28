@@ -10,9 +10,14 @@ import { useTerminalCopyPaste } from '../../hooks/useTerminalCopyPaste';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { TunnelManager } from '../tunnels/TunnelManager';
-import { TerminalContextMenu } from './TerminalContextMenu';
 import { RotateCw, Network } from 'lucide-react';
 import type { TabStatus } from '../../types/terminal';
+
+export interface TerminalCopyPasteHandle {
+  copySelection: () => void;
+  pasteClipboard: () => Promise<void>;
+  hasSelectionRef: React.MutableRefObject<boolean>;
+}
 
 interface Props {
   connectionId: string;
@@ -22,6 +27,7 @@ interface Props {
   isFocusedPane?: boolean;
   onStatusChange?: (status: TabStatus) => void;
   onSessionChange?: (sessionId?: string) => void;
+  onCopyPasteReady?: (handle: TerminalCopyPasteHandle) => void;
 }
 
 function getTerminalTheme() {
@@ -43,6 +49,7 @@ export function TerminalView({
   isFocusedPane = true,
   onStatusChange,
   onSessionChange,
+  onCopyPasteReady,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
@@ -61,13 +68,17 @@ export function TerminalView({
   const { updateTabStatus, setTabSessionId } = useTerminalStore();
   const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer, autoReconnect } = useSettingsStore();
 
-  const { contextMenu, closeContextMenu, copySelection, pasteClipboard, hasSelectionRef } = useTerminalCopyPaste({
+  const { copySelection, pasteClipboard, hasSelectionRef } = useTerminalCopyPaste({
     terminalRef,
     containerRef,
     sessionIdRef,
     encoderRef,
     writeFn: write,
   });
+
+  useEffect(() => {
+    onCopyPasteReady?.({ copySelection, pasteClipboard, hasSelectionRef });
+  }, [copySelection, pasteClipboard, hasSelectionRef, onCopyPasteReady]);
 
   useEffect(() => {
     statusChangeRef.current = onStatusChange
@@ -478,17 +489,6 @@ export function TerminalView({
       </div>
 
       {tunnelPanelOpen && <TunnelManager sessionId={sessionIdRef.current} />}
-
-      {contextMenu.visible && (
-        <TerminalContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          hasSelection={hasSelectionRef.current}
-          onCopy={copySelection}
-          onPaste={() => void pasteClipboard()}
-          onClose={closeContextMenu}
-        />
-      )}
     </div>
   );
 }
