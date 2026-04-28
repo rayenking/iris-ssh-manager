@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { DragEvent } from 'react';
 import { PanelBottom, PanelLeft, PanelRight, PanelTop, X } from 'lucide-react';
 import { useSplitStore, getPrimaryPaneId, type PaneSplitDirection } from '../../stores/splitStore';
 import type { SplitLeaf } from '../../types/split';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { TerminalView } from './TerminalView';
+import { TAB_DRAG_TYPE } from '../layout/TabBar';
 
 interface Props {
   pane: SplitLeaf;
@@ -20,8 +22,22 @@ const splitItems: Array<{
   { direction: 'up', label: 'Split Up', Icon: PanelTop },
 ];
 
+function getDropDirection(e: DragEvent<HTMLDivElement>): PaneSplitDirection | null {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top) / rect.height;
+  const edgeThreshold = 0.25;
+
+  if (x < edgeThreshold && x < y && x < (1 - y)) return 'left';
+  if (x > (1 - edgeThreshold) && (1 - x) < y && (1 - x) < (1 - y)) return 'right';
+  if (y < edgeThreshold) return 'up';
+  if (y > (1 - edgeThreshold)) return 'down';
+  return null;
+}
+
 export function TerminalPane({ pane }: Props) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [dropZone, setDropZone] = useState<PaneSplitDirection | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const focusedPaneId = useSplitStore((state) => state.focusedPaneId);
   const splitTree = useSplitStore((state) => state.splitTrees[pane.tabId] ?? null);
@@ -57,6 +73,35 @@ export function TerminalPane({ pane }: Props) {
     };
   }, [contextMenu]);
 
+  const handlePaneDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes(TAB_DRAG_TYPE)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    setDropZone(getDropDirection(e));
+  }, []);
+
+  const handlePaneDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setDropZone(null);
+  }, []);
+
+  const handlePaneDrop = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const sourceTabId = e.dataTransfer.getData(TAB_DRAG_TYPE);
+    setDropZone(null);
+    if (!sourceTabId) return;
+
+    const direction = getDropDirection(e);
+    if (!direction) return;
+
+    const sourceTab = useTerminalStore.getState().tabs.find((t) => t.id === sourceTabId);
+    if (!sourceTab || sourceTab.kind !== 'terminal') return;
+
+    useSplitStore.getState().splitPaneWithConnection(pane.tabId, pane.id, direction, sourceTab.connectionId);
+  }, [pane.id, pane.tabId]);
+
   const handleSplit = (direction: PaneSplitDirection) => {
     setContextMenu(null);
     splitPane(pane.tabId, pane.id, direction);
@@ -75,10 +120,23 @@ export function TerminalPane({ pane }: Props) {
         setFocusedPane(pane.id);
         setContextMenu({ x: event.clientX, y: event.clientY });
       }}
+      onDragOver={handlePaneDragOver}
+      onDragLeave={handlePaneDragLeave}
+      onDrop={handlePaneDrop}
       className={`group relative flex h-full min-h-0 min-w-0 flex-1 overflow-hidden border transition-colors ${
         isFocused ? 'border-[var(--color-accent)]' : 'border-transparent'
       }`}
     >
+      {dropZone && (
+        <div className="pointer-events-none absolute inset-0 z-30">
+          <div className={`absolute bg-[var(--color-accent)] opacity-20 transition-all ${
+            dropZone === 'left' ? 'inset-y-0 left-0 w-1/2' :
+            dropZone === 'right' ? 'inset-y-0 right-0 w-1/2' :
+            dropZone === 'up' ? 'inset-x-0 top-0 h-1/2' :
+            'inset-x-0 bottom-0 h-1/2'
+          }`} />
+        </div>
+      )}
       <TerminalView
         connectionId={pane.connectionId}
         tabId={pane.tabId}

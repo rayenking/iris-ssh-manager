@@ -14,14 +14,18 @@ interface QueueRequest {
   localPath: string;
   remotePath: string;
   sessionId: string;
+  sourceSessionId?: string;
+  destSessionId?: string;
 }
 
-export function useSFTP() {
+export function useSFTP(onTransferComplete?: () => void) {
   const [jobs, setJobs] = useState<TransferJob[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const jobsRef = useRef<TransferJob[]>([]);
   const isProcessingRef = useRef(false);
+  const onTransferCompleteRef = useRef(onTransferComplete);
+  onTransferCompleteRef.current = onTransferComplete;
 
   useEffect(() => {
     jobsRef.current = jobs;
@@ -94,6 +98,39 @@ export function useSFTP() {
     }
   }, []);
 
+  const localDelete = useCallback(async (path: string) => {
+    setError(null);
+    try {
+      await tauriApi.localDelete(path);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to delete local item';
+      setError(message);
+      throw e;
+    }
+  }, []);
+
+  const localRename = useCallback(async (oldPath: string, newPath: string) => {
+    setError(null);
+    try {
+      await tauriApi.localRename(oldPath, newPath);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to rename local item';
+      setError(message);
+      throw e;
+    }
+  }, []);
+
+  const localMkdir = useCallback(async (path: string) => {
+    setError(null);
+    try {
+      await tauriApi.localMkdir(path);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to create local folder';
+      setError(message);
+      throw e;
+    }
+  }, []);
+
   const processQueue = useCallback(async () => {
     if (isProcessingRef.current) {
       return;
@@ -119,7 +156,9 @@ export function useSFTP() {
     };
 
     try {
-      if (nextJob.direction === 'upload') {
+      if (nextJob.direction === 'remote-transfer' && nextJob.sourceSessionId && nextJob.destSessionId) {
+        await tauriApi.sftpRemoteTransfer(nextJob.sourceSessionId, nextJob.remotePath, nextJob.destSessionId, nextJob.localPath, channel);
+      } else if (nextJob.direction === 'upload') {
         await tauriApi.sftpUpload(nextJob.sessionId, nextJob.localPath, nextJob.remotePath, channel);
       } else {
         await tauriApi.sftpDownload(nextJob.sessionId, nextJob.remotePath, nextJob.localPath, channel);
@@ -134,6 +173,7 @@ export function useSFTP() {
           percentage: 100,
         },
       }));
+      onTransferCompleteRef.current?.();
     } catch (queueError) {
       const message = queueError instanceof Error ? queueError.message : 'Transfer failed';
       setError(message);
@@ -156,6 +196,8 @@ export function useSFTP() {
       progress: EMPTY_PROGRESS,
       speedBytesPerSecond: 0,
       sessionId: request.sessionId,
+      sourceSessionId: request.sourceSessionId,
+      destSessionId: request.destSessionId,
     };
 
     setJobs((currentJobs) => [...currentJobs, job]);
@@ -170,6 +212,17 @@ export function useSFTP() {
 
   const download = useCallback((sessionId: string, remotePath: string, localPath: string) => {
     enqueueTransfer({ direction: 'download', localPath, remotePath, sessionId });
+  }, [enqueueTransfer]);
+
+  const remoteTransfer = useCallback((sourceSessionId: string, sourcePath: string, destSessionId: string, destPath: string) => {
+    enqueueTransfer({
+      direction: 'remote-transfer',
+      localPath: destPath,
+      remotePath: sourcePath,
+      sessionId: sourceSessionId,
+      sourceSessionId,
+      destSessionId,
+    });
   }, [enqueueTransfer]);
 
   const cancelTransfer = useCallback((jobId: string) => {
@@ -197,6 +250,10 @@ export function useSFTP() {
     mkdir,
     remove,
     rename,
+    localDelete,
+    localRename,
+    localMkdir,
+    remoteTransfer,
     cancelTransfer,
   };
 }

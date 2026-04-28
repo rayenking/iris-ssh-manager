@@ -9,6 +9,7 @@ interface SplitState {
   initSplit: (tabId: string, connectionId: string) => void;
   removeSplit: (tabId: string) => void;
   splitPane: (tabId: string, paneId: string, direction: PaneSplitDirection) => void;
+  splitPaneWithConnection: (tabId: string, paneId: string, direction: PaneSplitDirection, connectionId: string) => void;
   closePane: (tabId: string, paneId: string) => void;
   updateRatio: (tabId: string, path: number[], ratio: number) => void;
   setFocusedPane: (paneId: string | null) => void;
@@ -95,6 +96,23 @@ function splitNode(node: SplitNode, paneId: string, direction: PaneSplitDirectio
     ...node,
     first: splitNode(node.first, paneId, direction, tabId),
     second: splitNode(node.second, paneId, direction, tabId),
+  };
+}
+
+function splitNodeWithConnection(node: SplitNode, paneId: string, direction: PaneSplitDirection, tabId: string, connectionId: string): SplitNode {
+  if (node.type === 'leaf') {
+    if (node.id !== paneId) {
+      return node;
+    }
+
+    const nextLeaf = createLeaf(tabId, connectionId);
+    return createBranch(direction, node, nextLeaf);
+  }
+
+  return {
+    ...node,
+    first: splitNodeWithConnection(node.first, paneId, direction, tabId, connectionId),
+    second: splitNodeWithConnection(node.second, paneId, direction, tabId, connectionId),
   };
 }
 
@@ -210,6 +228,29 @@ export const useSplitStore = create<SplitState>((set, get) => ({
       }
 
       const nextTree = splitNode(tree, paneId, direction, tabId);
+      const nextPaneIds = collectPaneIds(nextTree);
+      const previousPaneIds = new Set(collectPaneIds(tree));
+      const newPaneId = nextPaneIds.find((id) => !previousPaneIds.has(id)) ?? paneId;
+
+      return {
+        splitTrees: {
+          ...state.splitTrees,
+          [tabId]: nextTree,
+        },
+        focusedPaneId: newPaneId,
+      };
+    });
+  },
+
+  splitPaneWithConnection: (tabId, paneId, direction, connectionId) => {
+    set((state) => {
+      const tree = state.splitTrees[tabId];
+
+      if (!tree) {
+        return state;
+      }
+
+      const nextTree = splitNodeWithConnection(tree, paneId, direction, tabId, connectionId);
       const nextPaneIds = collectPaneIds(nextTree);
       const previousPaneIds = new Set(collectPaneIds(tree));
       const newPaneId = nextPaneIds.find((id) => !previousPaneIds.has(id)) ?? paneId;
