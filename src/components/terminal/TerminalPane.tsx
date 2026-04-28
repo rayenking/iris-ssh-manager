@@ -40,6 +40,7 @@ function getDropDirection(e: DragEvent<HTMLDivElement>): PaneSplitDirection | nu
 export function TerminalPane({ pane }: Props) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [dropZone, setDropZone] = useState<PaneSplitDirection | null>(null);
+  const [hasSelection, setHasSelection] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const copyPasteRef = useRef<TerminalCopyPasteHandle | null>(null);
 
@@ -136,6 +137,7 @@ export function TerminalPane({ pane }: Props) {
       onContextMenu={(event) => {
         event.preventDefault();
         setFocusedPane(pane.id);
+        setHasSelection(copyPasteRef.current?.hasSelectionRef.current ?? false);
         setContextMenu({ x: event.clientX, y: event.clientY });
       }}
       onDragOver={handlePaneDragOver}
@@ -198,7 +200,7 @@ export function TerminalPane({ pane }: Props) {
         >
           <button
             type="button"
-            disabled={!copyPasteRef.current?.hasSelectionRef.current}
+            disabled={!hasSelection}
             onClick={() => { copyPasteRef.current?.copySelection(); setContextMenu(null); }}
             className="flex w-full items-center px-4 py-2 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] disabled:opacity-40 disabled:cursor-default disabled:hover:bg-transparent"
           >
