@@ -61,12 +61,6 @@ export function useTerminalCopyPaste({
         return false;
       }
 
-      if (ctrl && !e.shiftKey && (e.key === 'v' || e.key === 'V')) {
-        e.preventDefault();
-        void pasteClipboard();
-        return false;
-      }
-
       return true;
     });
   }, [copySelection, pasteClipboard]);
