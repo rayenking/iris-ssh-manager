@@ -43,6 +43,15 @@ export function useTerminalCopyPaste({
     }
   }, [sessionIdRef, encoderRef, writeFn]);
 
+  const attachSelectionCopy = useCallback((terminal: Terminal) => {
+    terminal.onSelectionChange(() => {
+      const selection = terminal.getSelection();
+      if (selection) {
+        void navigator.clipboard.writeText(selection);
+      }
+    });
+  }, []);
+
   const attachKeyHandler = useCallback((terminal: Terminal) => {
     terminal.attachCustomKeyEventHandler((e: KeyboardEvent) => {
       if (e.type !== 'keydown') return true;
@@ -65,10 +74,15 @@ export function useTerminalCopyPaste({
     });
   }, [copySelection, pasteClipboard]);
 
+  const attach = useCallback((terminal: Terminal) => {
+    attachSelectionCopy(terminal);
+    attachKeyHandler(terminal);
+  }, [attachSelectionCopy, attachKeyHandler]);
+
   return {
     copySelection,
     pasteClipboard,
     hasSelection,
-    attachKeyHandler,
+    attach,
   };
 }
