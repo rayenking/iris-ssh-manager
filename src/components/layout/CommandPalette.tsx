@@ -89,6 +89,15 @@ export function CommandPalette() {
       }
     },
     {
+      id: 'action-local-terminal',
+      title: 'Local Terminal',
+      type: 'action',
+      icon: <Terminal className="w-4 h-4" />,
+      onSelect: () => {
+        useTerminalStore.getState().openLocalTab();
+      }
+    },
+    {
       id: 'action-settings',
       title: 'Settings',
       type: 'action',

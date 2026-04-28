@@ -1,5 +1,5 @@
 export type TabStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
-export type TabKind = 'terminal' | 'files';
+export type TabKind = 'terminal' | 'local-terminal' | 'files';
 
 interface BaseTab {
   id: string;
@@ -14,9 +14,15 @@ export interface TerminalTab extends BaseTab {
   sessionId?: string;
 }
 
+export interface LocalTerminalTab extends BaseTab {
+  kind: 'local-terminal';
+  status: TabStatus;
+  sessionId?: string;
+}
+
 export interface FileBrowserTab extends BaseTab {
   kind: 'files';
   terminalTabId: string;
 }
 
-export type AppTab = TerminalTab | FileBrowserTab;
+export type AppTab = TerminalTab | FileBrowserTab | LocalTerminalTab;

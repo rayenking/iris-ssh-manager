@@ -15,6 +15,7 @@ const defaultRegistry: KeybindingRegistry = {
   'toggle-snippets': { combo: 'Ctrl+Shift+s' },
   'open-import-config': { combo: 'Ctrl+Shift+i' },
   'open-sftp': { combo: 'Ctrl+Shift+o' },
+  'local-terminal': { combo: 'Ctrl+Shift+t' },
 };
 
 const registry: KeybindingRegistry = {

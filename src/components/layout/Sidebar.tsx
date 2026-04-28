@@ -1,12 +1,14 @@
-import { Search, Plus, ChevronLeft, ChevronRight, Code, Settings } from 'lucide-react';
+import { Search, Plus, ChevronLeft, ChevronRight, Code, Settings, Terminal } from 'lucide-react';
 import { useUiStore } from '../../stores/uiStore';
 import { useConnectionStore } from '../../stores/connectionStore';
+import { useTerminalStore } from '../../stores/terminalStore';
 import { ConnectionList } from '../connections/ConnectionList';
 import { QuickConnect } from '../connections/QuickConnect';
 
 export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar, toggleSnippets, setSettingsOpen } = useUiStore();
   const { searchQuery, setSearchQuery } = useConnectionStore();
+  const openLocalTab = useTerminalStore((state) => state.openLocalTab);
 
   const handleNewConnection = () => {
     window.dispatchEvent(new CustomEvent('open-connection-form', { detail: { connection: null } }));
@@ -62,6 +64,26 @@ export function Sidebar() {
               title="New Connection"
             >
               <Plus className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between">
+          {!sidebarCollapsed ? (
+            <button 
+              onClick={openLocalTab}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors flex-1"
+            >
+              <Terminal className="w-4 h-4" />
+              <span>Local Terminal</span>
+            </button>
+          ) : (
+            <button 
+              onClick={openLocalTab}
+              className="p-1.5 text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors w-full flex justify-center"
+              title="Local Terminal"
+            >
+              <Terminal className="w-4 h-4" />
             </button>
           )}
         </div>

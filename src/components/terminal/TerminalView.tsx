@@ -307,7 +307,6 @@ export function TerminalView({
         void resize(sessionIdRef.current, t.cols, t.rows).catch(() => {});
       });
 
-      const restoreCwd = isReconnectRef.current && lastCwdRef.current;
       const encoder = encoderRef.current;
 
       if (isReconnectRef.current) {
