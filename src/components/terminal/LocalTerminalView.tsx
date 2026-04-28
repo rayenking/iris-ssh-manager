@@ -182,7 +182,7 @@ export function LocalTerminalView({
       terminalRef.current = null;
       fitAddonRef.current = null;
     };
-  }, [cursorBlink, cursorStyle, resize, scrollbackBuffer, terminalFont, terminalFontSize, write]);
+  }, [resize, write]);
 
   useEffect(() => {
     const terminal = terminalRef.current;
@@ -244,6 +244,12 @@ export function LocalTerminalView({
 
     try {
       const sessionId = await open(terminal.cols || 80, terminal.rows || 24, (data) => {
+        if (data.length === 0) {
+          sessionIdRef.current = null;
+          emitSessionChange(undefined);
+          return;
+        }
+
         terminalRef.current?.write(new Uint8Array(data));
       });
 

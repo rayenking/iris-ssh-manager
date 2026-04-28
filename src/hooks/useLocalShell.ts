@@ -19,7 +19,14 @@ export function useLocalShell() {
     setError(null);
 
     const channel = new Channel<number[]>();
-    channel.onmessage = onData;
+    channel.onmessage = (data) => {
+      if (data.length === 0) {
+        activeSessionIdRef.current = null;
+        setConnectionState('disconnected');
+      }
+
+      onData(data);
+    };
 
     try {
       const sessionId = await tauriApi.localShellOpen(channel, cols, rows);
