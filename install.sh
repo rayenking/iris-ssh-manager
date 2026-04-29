@@ -12,15 +12,17 @@ error() { printf '\033[1;31mError: %s\033[0m\n' "$*" >&2; exit 1; }
 OS="$(uname -s)"
 ARCH="$(uname -m)"
 
-install_linux_deb() {
-  info "Fetching latest release..."
+fetch_tag() {
   TAG=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | head -1 | cut -d'"' -f4)
   [[ -n "$TAG" ]] || error "Failed to fetch latest release tag"
-  info "Latest version: $TAG"
-
   VERSION="${TAG#v}"
-  DEB_NAME="Iris-SSH-Manager_${VERSION}_amd64.deb"
-  DEB_URL="https://github.com/$REPO/releases/download/$TAG/$DEB_NAME"
+  info "Latest version: $TAG"
+}
+
+install_linux_deb() {
+  fetch_tag
+  local DEB_NAME="Iris-SSH-Manager_${VERSION}_amd64.deb"
+  local DEB_URL="https://github.com/$REPO/releases/download/$TAG/$DEB_NAME"
 
   info "Downloading $DEB_NAME..."
   curl -fSL -o "$TMPDIR/$DEB_NAME" "$DEB_URL" || error "Download failed"
@@ -29,7 +31,7 @@ install_linux_deb() {
     info "Installing with dpkg..."
     sudo dpkg -i "$TMPDIR/$DEB_NAME" || sudo apt-get install -f -y
   else
-    info "Extracting .deb manually (no apt-get)..."
+    info "Extracting .deb manually..."
     cd "$TMPDIR"
     ar x "$DEB_NAME"
     sudo tar xf data.tar.* -C /
@@ -52,14 +54,9 @@ install_arch() {
     sudo pacman -S --needed --noconfirm "${missing[@]}"
   fi
 
-  info "Fetching latest release..."
-  TAG=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | head -1 | cut -d'"' -f4)
-  [[ -n "$TAG" ]] || error "Failed to fetch latest release tag"
-  info "Latest version: $TAG"
-
-  VERSION="${TAG#v}"
-  DEB_NAME="Iris-SSH-Manager_${VERSION}_amd64.deb"
-  DEB_URL="https://github.com/$REPO/releases/download/$TAG/$DEB_NAME"
+  fetch_tag
+  local DEB_NAME="Iris-SSH-Manager_${VERSION}_amd64.deb"
+  local DEB_URL="https://github.com/$REPO/releases/download/$TAG/$DEB_NAME"
 
   info "Downloading $DEB_NAME..."
   curl -fSL -o "$TMPDIR/$DEB_NAME" "$DEB_URL" || error "Download failed"
@@ -73,43 +70,85 @@ install_arch() {
 }
 
 install_macos() {
-  info "Installing on macOS (build from source)..."
+  info "Installing on macOS..."
+  fetch_tag
 
-  command -v rustc &>/dev/null || error "Rust not found. Install: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
-  command -v node &>/dev/null || error "Node.js not found. Install: brew install node"
-  command -v npm &>/dev/null || error "npm not found. Install: brew install node"
+  local DMG_INTEL="Iris SSH Manager_${VERSION}_x64.dmg"
+  local DMG_ARM="Iris SSH Manager_${VERSION}_aarch64.dmg"
+  local DMG_NAME
 
-  info "Cloning repository..."
-  git clone --depth 1 "https://github.com/$REPO.git" "$TMPDIR/iris-ssh-manager"
-  cd "$TMPDIR/iris-ssh-manager"
-
-  info "Installing dependencies..."
-  npm install
-
-  info "Building (this may take a few minutes)..."
-  npx tauri build 2>&1 | tail -5
-
-  DMG=$(find src-tauri/target/release/bundle -name "*.dmg" 2>/dev/null | head -1)
-  APP=$(find src-tauri/target/release/bundle -name "*.app" -type d 2>/dev/null | head -1)
-
-  if [[ -n "$DMG" ]]; then
-    info "Opening DMG installer..."
-    open "$DMG"
-  elif [[ -n "$APP" ]]; then
-    info "Copying to /Applications..."
-    cp -r "$APP" /Applications/
-    info "Installed to /Applications/$(basename "$APP")"
+  if [[ "$ARCH" == "arm64" || "$ARCH" == "aarch64" ]]; then
+    DMG_NAME="$DMG_ARM"
   else
-    BINARY="src-tauri/target/release/app"
-    if [[ -f "$BINARY" ]]; then
-      sudo cp "$BINARY" /usr/local/bin/iris-ssh-manager
-      info "Binary installed to /usr/local/bin/iris-ssh-manager"
-    else
-      error "Build succeeded but no installable artifact found"
-    fi
+    DMG_NAME="$DMG_INTEL"
   fi
 
-  info "Iris SSH Manager installed on macOS!"
+  local DMG_URL="https://github.com/$REPO/releases/download/$TAG/$(echo "$DMG_NAME" | sed 's/ /%20/g')"
+
+  info "Downloading $DMG_NAME..."
+  if curl -fSL -o "$TMPDIR/iris.dmg" "$DMG_URL" 2>/dev/null; then
+    info "Mounting DMG..."
+    local MOUNT_POINT
+    MOUNT_POINT=$(hdiutil attach "$TMPDIR/iris.dmg" -nobrowse -quiet | tail -1 | awk '{print $NF}')
+
+    local APP
+    APP=$(find "$MOUNT_POINT" -maxdepth 1 -name "*.app" | head -1)
+
+    if [[ -n "$APP" ]]; then
+      info "Installing to /Applications..."
+      cp -R "$APP" /Applications/
+      hdiutil detach "$MOUNT_POINT" -quiet
+      info "Iris SSH Manager $TAG installed to /Applications!"
+    else
+      hdiutil detach "$MOUNT_POINT" -quiet
+      error "No .app found in DMG"
+    fi
+  else
+    warn "Pre-built DMG not available for $ARCH. Building from source..."
+    command -v rustc &>/dev/null || error "Rust not found. Install: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+    command -v node &>/dev/null || error "Node.js not found. Install: brew install node"
+
+    info "Cloning repository..."
+    git clone --depth 1 "https://github.com/$REPO.git" "$TMPDIR/iris-ssh-manager"
+    cd "$TMPDIR/iris-ssh-manager"
+
+    info "Installing dependencies..."
+    npm install
+
+    info "Building (this may take a few minutes)..."
+    npx tauri build 2>&1 | tail -5
+
+    local BUILT_DMG
+    BUILT_DMG=$(find src-tauri/target/release/bundle -name "*.dmg" 2>/dev/null | head -1)
+
+    if [[ -n "$BUILT_DMG" ]]; then
+      info "Opening DMG installer..."
+      open "$BUILT_DMG"
+    else
+      local BUILT_APP
+      BUILT_APP=$(find src-tauri/target/release/bundle -name "*.app" -type d 2>/dev/null | head -1)
+      if [[ -n "$BUILT_APP" ]]; then
+        cp -R "$BUILT_APP" /Applications/
+        info "Installed to /Applications/$(basename "$BUILT_APP")"
+      else
+        error "Build succeeded but no installable artifact found"
+      fi
+    fi
+
+    info "Iris SSH Manager installed from source!"
+  fi
+}
+
+install_windows() {
+  fetch_tag
+  local EXE_NAME="Iris SSH Manager_${VERSION}_x64-setup.exe"
+  local EXE_URL="https://github.com/$REPO/releases/download/$TAG/$(echo "$EXE_NAME" | sed 's/ /%20/g')"
+
+  info "Downloading $EXE_NAME..."
+  curl -fSL -o "$TMPDIR/iris-setup.exe" "$EXE_URL" || error "Download failed. Visit https://github.com/$REPO/releases"
+
+  info "Running installer..."
+  "$TMPDIR/iris-setup.exe"
 }
 
 case "$OS" in
@@ -124,8 +163,11 @@ case "$OS" in
   Darwin)
     install_macos
     ;;
+  MINGW*|MSYS*|CYGWIN*)
+    install_windows
+    ;;
   *)
-    error "Unsupported OS: $OS. Supported: Linux (x86_64), macOS"
+    error "Unsupported OS: $OS. Visit https://github.com/$REPO/releases"
     ;;
 esac
 
