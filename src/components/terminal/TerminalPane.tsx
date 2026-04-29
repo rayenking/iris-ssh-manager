@@ -180,17 +180,19 @@ export function TerminalPane({ pane }: Props) {
         />
       )}
 
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          handleClose();
-        }}
-        className="absolute right-2 top-2 z-20 rounded p-1 text-[var(--color-text-muted)] opacity-0 transition-all hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] group-hover:opacity-100"
-        title="Close pane"
-      >
-        <X className="h-4 w-4" />
-      </button>
+      {!isOnlyPane && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            handleClose();
+          }}
+          className="absolute right-10 top-2 z-20 rounded p-1 text-[var(--color-text-muted)] opacity-0 transition-all hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] group-hover:opacity-100"
+          title="Close pane"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
 
       {contextMenu && (
         <div

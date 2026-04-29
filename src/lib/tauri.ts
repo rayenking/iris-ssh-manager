@@ -475,6 +475,9 @@ export const tauriApi = {
   listTunnels: (sessionId: string): Promise<Tunnel[]> =>
     isTauriRuntime() ? invoke('list_tunnels', { sessionId }) : Promise.resolve([]),
 
+  removeTunnel: (tunnelId: string): Promise<void> =>
+    isTauriRuntime() ? invoke('remove_tunnel', { tunnelId }) : Promise.resolve(),
+
   // Snippets
   listSnippets: (): Promise<Snippet[]> =>
     isTauriRuntime() ? invoke('list_snippets') : Promise.resolve([]),

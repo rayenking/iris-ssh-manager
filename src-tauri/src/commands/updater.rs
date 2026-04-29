@@ -1,4 +1,6 @@
 use serde::Serialize;
+use std::path::PathBuf;
+use tauri::ipc::Channel;
 
 const REPO: &str = "rayenking/iris-ssh-manager";
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -98,6 +100,119 @@ pub async fn check_for_updates() -> Result<UpdateInfo, String> {
         release_notes,
         download_url,
     })
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadProgress {
+    pub downloaded: u64,
+    pub total: u64,
+    pub percentage: f32,
+}
+
+#[tauri::command]
+pub async fn download_update(
+    download_url: String,
+    on_progress: Channel<DownloadProgress>,
+) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .user_agent("iris-ssh-manager")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let resp = client
+        .get(&download_url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let total = resp.content_length().unwrap_or(0);
+    let filename = download_url
+        .split('/')
+        .last()
+        .unwrap_or("update")
+        .to_string();
+
+    let temp_dir = std::env::temp_dir().join("iris-ssh-manager-updates");
+    std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
+    let file_path = temp_dir.join(&filename);
+
+    let mut file = tokio::fs::File::create(&file_path)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    use tokio::io::AsyncWriteExt;
+    let mut stream = resp.bytes_stream();
+    use futures_util::StreamExt;
+    let mut downloaded: u64 = 0;
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| e.to_string())?;
+        file.write_all(&chunk).await.map_err(|e| e.to_string())?;
+        downloaded += chunk.len() as u64;
+        let percentage = if total > 0 {
+            (downloaded as f32 / total as f32) * 100.0
+        } else {
+            0.0
+        };
+        let _ = on_progress.send(DownloadProgress {
+            downloaded,
+            total,
+            percentage,
+        });
+    }
+
+    file.flush().await.map_err(|e| e.to_string())?;
+
+    Ok(file_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub async fn install_update(app: tauri::AppHandle, file_path: String) -> Result<(), String> {
+    let path = PathBuf::from(&file_path);
+    if !path.exists() {
+        return Err("Update file not found".to_string());
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if file_path.ends_with(".deb") {
+            std::process::Command::new("pkexec")
+                .args(["dpkg", "-i", &file_path])
+                .spawn()
+                .map_err(|e| format!("Failed to install: {e}"))?;
+        } else if file_path.ends_with(".AppImage") {
+            let current_exe =
+                std::env::current_exe().map_err(|e| format!("Cannot find current exe: {e}"))?;
+            std::fs::copy(&path, &current_exe)
+                .map_err(|e| format!("Failed to replace binary: {e}"))?;
+        } else {
+            return Err("Unsupported update format".to_string());
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&file_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open DMG: {e}"))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", &file_path])
+            .spawn()
+            .map_err(|e| format!("Failed to run installer: {e}"))?;
+    }
+
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        app.exit(0);
+    });
+
+    Ok(())
 }
 
 #[tauri::command]

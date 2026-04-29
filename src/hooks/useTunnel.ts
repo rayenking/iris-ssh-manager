@@ -67,6 +67,17 @@ export function useTunnel(sessionId?: string | null) {
     [sessionId],
   );
 
+  const removeTunnel = useCallback(
+    async (tunnelId: string) => {
+      await tauriApi.removeTunnel(tunnelId);
+      if (sessionId) {
+        const activeTunnels = await tauriApi.listTunnels(sessionId);
+        setTunnels(activeTunnels);
+      }
+    },
+    [sessionId],
+  );
+
   useEffect(() => {
     void refresh();
 
@@ -90,6 +101,7 @@ export function useTunnel(sessionId?: string | null) {
     error,
     createTunnel,
     stopTunnel,
+    removeTunnel,
     refresh,
   };
 }
