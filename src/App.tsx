@@ -18,6 +18,7 @@ import { initGlobalKeybindings, registerShortcut, unregisterShortcut } from "./l
 import type { Connection } from "./types/connection";
 import { SettingsPage } from "./components/settings/SettingsPage";
 import { UpdateNotification } from "./components/layout/UpdateNotification";
+import { TitleBar } from "./components/layout/TitleBar";
 
 function App() {
   const { currentTheme, snippetsOpen, toggleSnippets, importDialogOpen, setImportDialogOpen, settingsOpen, toggleCommandPalette, setSidebarCollapsed } = useUiStore();
@@ -138,7 +139,9 @@ function App() {
   }, []);
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] font-sans antialiased">
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] font-sans antialiased">
+      <TitleBar />
+      <div className="flex flex-1 min-h-0">
       <Sidebar />
       
       {snippetsOpen && (
@@ -191,6 +194,7 @@ function App() {
         <StatusBar />
       </div>
       
+      </div>
       <ImportDialog isOpen={importDialogOpen} onClose={() => setImportDialogOpen(false)} />
       {settingsOpen && <SettingsPage />}
       <ErrorToast />
