@@ -89,18 +89,22 @@ install_macos() {
   if curl -fSL -o "$TMPDIR/iris.dmg" "$DMG_URL" 2>/dev/null; then
     info "Mounting DMG..."
     local MOUNT_POINT
-    MOUNT_POINT=$(hdiutil attach "$TMPDIR/iris.dmg" -nobrowse -quiet | tail -1 | awk '{print $NF}')
+    MOUNT_POINT=$(hdiutil attach "$TMPDIR/iris.dmg" -nobrowse | grep '/Volumes/' | sed 's/.*\(\/Volumes\/.*\)/\1/' | head -1)
+
+    if [[ -z "$MOUNT_POINT" ]]; then
+      error "Failed to mount DMG"
+    fi
 
     local APP
-    APP=$(find "$MOUNT_POINT" -maxdepth 1 -name "*.app" | head -1)
+    APP=$(find "$MOUNT_POINT" -maxdepth 1 -name "*.app" -print -quit)
 
     if [[ -n "$APP" ]]; then
       info "Installing to /Applications..."
       cp -R "$APP" /Applications/
-      hdiutil detach "$MOUNT_POINT" -quiet
+      hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true
       info "Iris SSH Manager $TAG installed to /Applications!"
     else
-      hdiutil detach "$MOUNT_POINT" -quiet
+      hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true
       error "No .app found in DMG"
     fi
   else
