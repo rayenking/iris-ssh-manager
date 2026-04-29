@@ -5,12 +5,11 @@ import { SearchAddon } from '@xterm/addon-search';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useLocalShell } from '../../hooks/useLocalShell';
 import { useTerminalCopyPaste } from '../../hooks/useTerminalCopyPaste';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { TerminalInputEditor } from './TerminalInputEditor';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import type { TerminalCopyPasteHandle } from './TerminalView';
 import type { TabStatus } from '../../types/terminal';
@@ -53,7 +52,6 @@ export function LocalTerminalView({
   const encoderRef = useRef(new TextEncoder());
   const statusChangeRef = useRef<(status: TabStatus) => void>(() => {});
   const sessionChangeRef = useRef<(sessionId?: string) => void>(() => {});
-  const [inputEditorEnabled, setInputEditorEnabled] = useState(false);
   const { open, close, write, resize, connectionState, error } = useLocalShell();
   const { updateTabStatus, setTabSessionId, activeTabId: currentActiveTabId } = useTerminalStore();
   const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer } = useSettingsStore();
@@ -330,19 +328,6 @@ export function LocalTerminalView({
     emitStatusChange('disconnected');
   }, [connectionState, emitStatusChange]);
 
-  const handleInputEditorSubmit = useCallback((command: string) => {
-    const sessionId = sessionIdRef.current;
-    if (!sessionId) return;
-
-    const data = Array.from(encoderRef.current.encode(command + '\r'));
-    void write(sessionId, data).catch(() => {});
-
-    requestAnimationFrame(() => {
-      terminalRef.current?.scrollToBottom();
-      terminalRef.current?.focus();
-    });
-  }, [write]);
-
   useEffect(() => {
     if (!reportTabState) {
       return;
@@ -356,14 +341,6 @@ export function LocalTerminalView({
     <div ref={containerRef} data-pane-id={paneId} className="relative flex h-full w-full min-h-0 flex-1 bg-[var(--color-bg-primary)]">
       <div className="relative flex h-full min-w-0 flex-1 flex-col">
         <div ref={terminalHostRef} className="flex-1 min-h-0 overflow-hidden px-1 py-1" />
-
-        {connectionState === 'connected' && (
-          <TerminalInputEditor
-            onSubmit={handleInputEditorSubmit}
-            enabled={inputEditorEnabled}
-            onToggle={() => setInputEditorEnabled(prev => !prev)}
-          />
-        )}
 
         {connectionState === 'connecting' && (
           <div className="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-bg-primary)_82%,transparent)]">
