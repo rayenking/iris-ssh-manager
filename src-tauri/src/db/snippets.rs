@@ -13,6 +13,8 @@ pub struct Snippet {
     pub category: Option<String>,
     pub variables: Option<String>,
     pub sort_order: Option<i64>,
+    pub scope: Option<String>,
+    pub connection_ids: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,6 +25,8 @@ pub struct CreateSnippetInput {
     pub category: Option<String>,
     pub variables: Option<String>,
     pub sort_order: Option<i64>,
+    pub scope: Option<String>,
+    pub connection_ids: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -33,6 +37,8 @@ pub struct UpdateSnippetInput {
     pub category: Option<String>,
     pub variables: Option<String>,
     pub sort_order: Option<i64>,
+    pub scope: Option<String>,
+    pub connection_ids: Option<String>,
 }
 
 pub struct SnippetRepo;
@@ -70,7 +76,7 @@ impl SnippetRepo {
 
 fn list_all_with_conn(conn: &SqliteConnection) -> Result<Vec<Snippet>> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, command, category, variables, sort_order FROM snippets ORDER BY sort_order IS NULL, sort_order ASC, name COLLATE NOCASE ASC",
+        "SELECT id, name, command, category, variables, sort_order, scope, connection_ids FROM snippets ORDER BY sort_order IS NULL, sort_order ASC, name COLLATE NOCASE ASC",
     )?;
     let rows = stmt.query_map([], map_snippet)?;
     let items = rows.collect::<rusqlite::Result<Vec<_>>>()?;
@@ -79,7 +85,7 @@ fn list_all_with_conn(conn: &SqliteConnection) -> Result<Vec<Snippet>> {
 
 fn get_by_id_with_conn(conn: &SqliteConnection, id: &str) -> Result<Option<Snippet>> {
     conn.query_row(
-        "SELECT id, name, command, category, variables, sort_order FROM snippets WHERE id = ?1",
+        "SELECT id, name, command, category, variables, sort_order, scope, connection_ids FROM snippets WHERE id = ?1",
         params![id],
         map_snippet,
     )
@@ -90,8 +96,8 @@ fn get_by_id_with_conn(conn: &SqliteConnection, id: &str) -> Result<Option<Snipp
 fn create_with_conn(conn: &SqliteConnection, data: &CreateSnippetInput) -> Result<Snippet> {
     let id = Uuid::new_v4().to_string();
     conn.execute(
-        "INSERT INTO snippets (id, name, command, category, variables, sort_order) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![id, data.name, data.command, data.category, data.variables, data.sort_order],
+        "INSERT INTO snippets (id, name, command, category, variables, sort_order, scope, connection_ids) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![id, data.name, data.command, data.category, data.variables, data.sort_order, data.scope, data.connection_ids],
     )?;
     require_snippet(conn, &id)
 }
@@ -109,7 +115,9 @@ fn update_with_conn(
             command = ?3,
             category = ?4,
             variables = ?5,
-            sort_order = ?6
+            sort_order = ?6,
+            scope = ?7,
+            connection_ids = ?8
         WHERE id = ?1
         ",
         params![
@@ -119,6 +127,8 @@ fn update_with_conn(
             data.category.as_ref().or(existing.category.as_ref()),
             data.variables.as_ref().or(existing.variables.as_ref()),
             data.sort_order.or(existing.sort_order),
+            data.scope.as_ref().or(existing.scope.as_ref()),
+            data.connection_ids.as_ref().or(existing.connection_ids.as_ref()),
         ],
     )?;
     require_snippet(conn, id)
@@ -141,5 +151,7 @@ fn map_snippet(row: &Row<'_>) -> rusqlite::Result<Snippet> {
         category: row.get(3)?,
         variables: row.get(4)?,
         sort_order: row.get(5)?,
+        scope: row.get(6)?,
+        connection_ids: row.get(7)?,
     })
 }

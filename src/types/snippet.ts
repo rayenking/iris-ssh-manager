@@ -1,3 +1,5 @@
+export type SnippetScope = 'global' | 'connections';
+
 export interface Snippet {
   id: string;
   name: string;
@@ -5,6 +7,8 @@ export interface Snippet {
   category: string | null;
   variables: string | null;
   sortOrder: number | null;
+  scope: SnippetScope | null;
+  connectionIds: string | null;
 }
 
 export interface CreateSnippetInput {
@@ -13,6 +17,8 @@ export interface CreateSnippetInput {
   category?: string | null;
   variables?: string | null;
   sortOrder?: number | null;
+  scope?: SnippetScope | null;
+  connectionIds?: string | null;
 }
 
 export interface UpdateSnippetInput {
@@ -21,4 +27,6 @@ export interface UpdateSnippetInput {
   category?: string | null;
   variables?: string | null;
   sortOrder?: number | null;
+  scope?: SnippetScope | null;
+  connectionIds?: string | null;
 }

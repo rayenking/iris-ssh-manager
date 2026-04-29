@@ -21,7 +21,20 @@ export function SnippetManager() {
   const activeTab = tabs.find(t => t.id === activeTabId);
   const activeTerminalTab = activeTab?.kind === 'terminal' ? activeTab : null;
 
-  const filteredSnippets = snippets.filter(s =>
+  const activeConnectionId = activeTerminalTab?.connectionId ?? null;
+
+  const scopedSnippets = snippets.filter(s => {
+    if (!s.scope || s.scope === 'global') return true;
+    if (s.scope === 'connections' && s.connectionIds && activeConnectionId) {
+      try {
+        const ids: string[] = JSON.parse(s.connectionIds);
+        return ids.includes(activeConnectionId);
+      } catch { return false; }
+    }
+    return !activeConnectionId;
+  });
+
+  const filteredSnippets = scopedSnippets.filter(s =>
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.command.toLowerCase().includes(searchQuery.toLowerCase())
   );
