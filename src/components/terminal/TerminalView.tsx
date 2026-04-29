@@ -11,7 +11,6 @@ import { useTerminalCopyPaste } from '../../hooks/useTerminalCopyPaste';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { TunnelManager } from '../tunnels/TunnelManager';
-import { TerminalInputEditor } from './TerminalInputEditor';
 import { RotateCw, Network } from 'lucide-react';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import type { TabStatus } from '../../types/terminal';
@@ -67,7 +66,6 @@ export function TerminalView({
   const statusChangeRef = useRef<(status: TabStatus) => void>(() => {});
   const sessionChangeRef = useRef<(sessionId?: string) => void>(() => {});
   const [tunnelPanelOpen, setTunnelPanelOpen] = useState(false);
-  const [inputEditorEnabled, setInputEditorEnabled] = useState(false);
   const { connect, disconnect, write, resize, connectionState, error } = useSSH();
   const { updateTabStatus, setTabSessionId } = useTerminalStore();
   const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer, autoReconnect } = useSettingsStore();
@@ -381,19 +379,6 @@ export function TerminalView({
     };
   }, [disconnect, doConnect, emitSessionChange, emitStatusChange]);
 
-  const handleInputEditorSubmit = useCallback((command: string) => {
-    const sessionId = sessionIdRef.current;
-    if (!sessionId) return;
-
-    const data = Array.from(encoderRef.current.encode(command + '\r'));
-    void write(sessionId, data).catch(() => {});
-
-    requestAnimationFrame(() => {
-      terminalRef.current?.scrollToBottom();
-      terminalRef.current?.focus();
-    });
-  }, [write]);
-
   useEffect(() => {
     if (connectionState !== 'disconnected' || !autoReconnect) return;
     if (!sessionIdRef.current && reconnectAttemptRef.current === 0) return;
@@ -449,14 +434,6 @@ export function TerminalView({
     <div ref={containerRef} data-pane-id={paneId} className="relative flex h-full w-full min-h-0 flex-1 bg-[var(--color-bg-primary)]">
       <div className="relative flex-1 min-w-0 flex flex-col h-full">
         <div ref={terminalHostRef} className="flex-1 min-h-0 overflow-hidden px-1 py-1" />
-
-        {connectionState === 'connected' && (
-          <TerminalInputEditor
-            onSubmit={handleInputEditorSubmit}
-            enabled={inputEditorEnabled}
-            onToggle={() => setInputEditorEnabled(prev => !prev)}
-          />
-        )}
 
         {connectionState === 'connected' && (
           <button
