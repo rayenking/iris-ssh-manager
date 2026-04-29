@@ -1,10 +1,12 @@
 import { Moon, Sun, Activity } from 'lucide-react';
 import { useUiStore } from '../../stores/uiStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useUpdateChecker } from './UpdateNotification';
 
 export function StatusBar() {
   const { currentTheme, setTheme } = useUiStore();
   const updateTheme = useSettingsStore((state) => state.setTheme);
+  const { currentVersion } = useUpdateChecker();
 
   const toggleTheme = () => {
     const newTheme = currentTheme === 'dark-minimal' ? 'iris-pink' : 'dark-minimal';
@@ -22,7 +24,7 @@ export function StatusBar() {
       </div>
       
       <div className="flex items-center gap-4">
-        <span>Iris SSH Manager</span>
+        <span>Iris SSH Manager{currentVersion ? ` v${currentVersion}` : ''}</span>
         <button 
           onClick={toggleTheme}
           className="flex items-center gap-1.5 hover:text-[var(--color-text-primary)] transition-colors"
