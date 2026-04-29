@@ -88,9 +88,19 @@ export function useTerminalCopyPaste({
         return false;
       }
 
+      if (e.shiftKey && e.key === 'Enter') {
+        e.preventDefault();
+        const sessionId = sessionIdRef.current;
+        if (sessionId) {
+          const seq = encoderRef.current.encode('\x1b[13;2u');
+          void writeFn(sessionId, Array.from(seq));
+        }
+        return false;
+      }
+
       return true;
     });
-  }, [copySelection, pasteClipboard]);
+  }, [copySelection, pasteClipboard, sessionIdRef, encoderRef, writeFn]);
 
   const attach = useCallback((terminal: Terminal) => {
     attachSelectionCopy(terminal);
