@@ -37,9 +37,12 @@ export function UpdateNotification() {
   useEffect(() => {
     const timer = setTimeout(checkForUpdates, 3000);
     const interval = setInterval(checkForUpdates, 3600000);
+    const onManualCheck = () => checkForUpdates();
+    window.addEventListener('iris-check-updates', onManualCheck);
     return () => {
       clearTimeout(timer);
       clearInterval(interval);
+      window.removeEventListener('iris-check-updates', onManualCheck);
     };
   }, [checkForUpdates]);
 
@@ -107,11 +110,34 @@ export function UpdateNotification() {
 
 export function useUpdateChecker() {
   const [currentVersion, setCurrentVersion] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [result, setResult] = useState<'none' | 'up-to-date' | 'error' | null>(null);
 
   useEffect(() => {
     if (!isTauri()) return;
     invoke<string>('get_current_version').then(setCurrentVersion).catch(() => {});
   }, []);
 
-  return { currentVersion };
+  const manualCheck = useCallback(async () => {
+    if (!isTauri() || checking) return;
+    setChecking(true);
+    setResult(null);
+    try {
+      const info = await invoke<UpdateInfo>('check_for_updates');
+      if (info.hasUpdate) {
+        window.dispatchEvent(new CustomEvent('iris-check-updates'));
+        setResult(null);
+      } else {
+        setResult('up-to-date');
+        setTimeout(() => setResult(null), 3000);
+      }
+    } catch {
+      setResult('error');
+      setTimeout(() => setResult(null), 3000);
+    } finally {
+      setChecking(false);
+    }
+  }, [checking]);
+
+  return { currentVersion, manualCheck, checking, result };
 }
