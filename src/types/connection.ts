@@ -36,6 +36,7 @@ export interface CreateConnectionInput {
   groupId?: string;
   colorTag?: string;
   startupCommand?: string;
+  sortOrder?: number;
 }
 
 export interface UpdateConnectionInput extends Partial<CreateConnectionInput> {}
