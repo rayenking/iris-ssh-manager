@@ -231,9 +231,9 @@ impl TunnelManager {
         let bound_port = {
             let mut handle = self.handle.lock().await;
             handle
-                .tcpip_forward("127.0.0.1", u32::from(remote_port))
+                .tcpip_forward("", u32::from(remote_port))
                 .await
-                .with_context(|| format!("failed to create remote forward on port {remote_port}"))?
+                .with_context(|| format!("failed to create remote forward on port {remote_port} — the SSH server may have AllowTcpForwarding or GatewayPorts disabled"))?
                 as u16
         };
 
@@ -248,7 +248,7 @@ impl TunnelManager {
 
             let cancel_result = {
                 let handle = handle.lock().await;
-                handle.cancel_tcpip_forward("127.0.0.1", u32::from(bound_port)).await
+                handle.cancel_tcpip_forward("", u32::from(bound_port)).await
             };
 
             if let Err(error) = cancel_result {
@@ -378,6 +378,18 @@ impl TunnelManager {
 
     pub async fn has_tunnel(&self, tunnel_id: &Uuid) -> bool {
         self.state.lock().await.tunnels.contains_key(tunnel_id)
+    }
+
+    pub async fn remove_tunnel(&self, tunnel_id: &Uuid) -> Result<()> {
+        let mut state = self.state.lock().await;
+        let Some(tunnel) = state.tunnels.get(tunnel_id) else {
+            return Err(anyhow!("tunnel not found: {tunnel_id}"));
+        };
+        if matches!(tunnel.status, TunnelStatus::Active) {
+            return Err(anyhow!("cannot remove active tunnel — stop it first"));
+        }
+        state.tunnels.remove(tunnel_id);
+        Ok(())
     }
 
     async fn run_local_listener(
