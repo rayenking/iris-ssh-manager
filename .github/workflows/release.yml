@@ -106,11 +106,22 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          merge-multiple: true
+
+      - name: List downloaded artifacts
+        run: find artifacts -type f | head -50
+
+      - name: Flatten artifacts
+        run: |
+          mkdir -p release-files
+          find artifacts -type f \( -name '*.deb' -o -name '*.AppImage' -o -name '*.dmg' -o -name '*.exe' -o -name '*.msi' \) -exec cp {} release-files/ \;
+          ls -la release-files/
 
       - name: Checkout for tag detection
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          path: repo
 
       - name: Determine tag
         id: tag
@@ -120,6 +131,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "push" ]]; then
             echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           else
+            cd repo
             TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
             echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           fi
@@ -130,11 +142,6 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: Iris SSH Manager ${{ steps.tag.outputs.tag }}
           draft: false
-          files: |
-            artifacts/**/*.deb
-            artifacts/**/*.AppImage
-            artifacts/**/*.dmg
-            artifacts/**/*.exe
-            artifacts/**/*.msi
+          files: release-files/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
