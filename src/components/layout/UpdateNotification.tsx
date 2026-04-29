@@ -17,7 +17,7 @@ const isTauri = () => !!(window as any).__TAURI_INTERNALS__;
 export function UpdateNotification() {
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [dismissed, setDismissed] = useState(false);
-  const [checking, setChecking] = useState(false);
+  const [_checking, setChecking] = useState(false);
 
   const checkForUpdates = useCallback(async () => {
     if (!isTauri()) return;
