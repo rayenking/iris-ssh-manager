@@ -7,3 +7,4 @@ pub mod sftp;
 pub mod terminal;
 pub mod snippets;
 pub mod settings;
+pub mod updater;

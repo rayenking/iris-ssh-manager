@@ -17,6 +17,7 @@ import { applyTheme } from "./lib/themes";
 import { initGlobalKeybindings, registerShortcut, unregisterShortcut } from "./lib/keybindings";
 import type { Connection } from "./types/connection";
 import { SettingsPage } from "./components/settings/SettingsPage";
+import { UpdateNotification } from "./components/layout/UpdateNotification";
 
 function App() {
   const { currentTheme, snippetsOpen, toggleSnippets, importDialogOpen, setImportDialogOpen, settingsOpen, toggleCommandPalette, setSidebarCollapsed } = useUiStore();
@@ -200,6 +201,7 @@ function App() {
       {settingsOpen && <SettingsPage />}
       <ErrorToast />
       <CommandPalette />
+      <UpdateNotification />
       
       {editingConnection !== undefined && (
         <ConnectionForm 
