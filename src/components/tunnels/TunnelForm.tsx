@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { X } from 'lucide-react';
 import type { TunnelConfig, TunnelType } from '../../types/tunnel';
 
 interface Props {
   isSubmitting: boolean;
+  initialConfig?: TunnelConfig;
   onClose: () => void;
   onSubmit: (config: TunnelConfig) => Promise<void>;
 }
@@ -17,57 +18,56 @@ type TunnelFormState = {
   localHost: string;
 };
 
-const DEFAULT_STATE: TunnelFormState = {
-  type: 'local',
-  localPort: '8080',
-  remoteHost: 'localhost',
-  remotePort: '80',
-  localHost: '127.0.0.1',
-};
+function configToState(config?: TunnelConfig): TunnelFormState {
+  if (!config) return { type: 'local', localPort: '8080', remoteHost: 'localhost', remotePort: '80', localHost: '127.0.0.1' };
+  if (config.type === 'local') return { type: 'local', localPort: String(config.localPort), remoteHost: config.remoteHost, remotePort: String(config.remotePort), localHost: '127.0.0.1' };
+  if (config.type === 'remote') return { type: 'remote', localPort: String(config.localPort), remoteHost: 'localhost', remotePort: String(config.remotePort), localHost: config.localHost };
+  return { type: 'dynamic', localPort: String(config.localPort), remoteHost: 'localhost', remotePort: '80', localHost: '127.0.0.1' };
+}
 
-export function TunnelForm({ isSubmitting, onClose, onSubmit }: Props) {
-  const [formState, setFormState] = useState<TunnelFormState>(DEFAULT_STATE);
-
-  useEffect(() => {
-    if (!isSubmitting) {
-      return;
-    }
-  }, [isSubmitting]);
+export function TunnelForm({ isSubmitting, initialConfig, onClose, onSubmit }: Props) {
+  const [formState, setFormState] = useState<TunnelFormState>(() => configToState(initialConfig));
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    setError(null);
 
-    if (formState.type === 'local') {
+    try {
+      if (formState.type === 'local') {
+        await onSubmit({
+          type: 'local',
+          localPort: Number(formState.localPort),
+          remoteHost: formState.remoteHost,
+          remotePort: Number(formState.remotePort),
+        });
+        return;
+      }
+
+      if (formState.type === 'remote') {
+        await onSubmit({
+          type: 'remote',
+          remotePort: Number(formState.remotePort),
+          localHost: formState.localHost,
+          localPort: Number(formState.localPort),
+        });
+        return;
+      }
+
       await onSubmit({
-        type: 'local',
-        localPort: Number(formState.localPort),
-        remoteHost: formState.remoteHost,
-        remotePort: Number(formState.remotePort),
-      });
-      return;
-    }
-
-    if (formState.type === 'remote') {
-      await onSubmit({
-        type: 'remote',
-        remotePort: Number(formState.remotePort),
-        localHost: formState.localHost,
+        type: 'dynamic',
         localPort: Number(formState.localPort),
       });
-      return;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     }
-
-    await onSubmit({
-      type: 'dynamic',
-      localPort: Number(formState.localPort),
-    });
   };
 
   return (
     <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
-          <h3 className="text-sm font-medium text-[var(--color-text-primary)]">Add Tunnel</h3>
+          <h3 className="text-sm font-medium text-[var(--color-text-primary)]">{initialConfig ? 'Edit Tunnel' : 'Add Tunnel'}</h3>
           <button
             onClick={onClose}
             className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
@@ -111,6 +111,12 @@ export function TunnelForm({ isSubmitting, onClose, onSubmit }: Props) {
             <PortField label="Local Port" value={formState.localPort} onChange={(value) => setFormState((current) => ({ ...current, localPort: value }))} />
           )}
 
+          {error && (
+            <div className="rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+              {error}
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 border-t border-[var(--color-border)] pt-4">
             <button
               type="button"
@@ -124,7 +130,7 @@ export function TunnelForm({ isSubmitting, onClose, onSubmit }: Props) {
               disabled={isSubmitting}
               className="rounded bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isSubmitting ? 'Creating…' : 'Create Tunnel'}
+              {isSubmitting ? 'Saving…' : initialConfig ? 'Save Tunnel' : 'Create Tunnel'}
             </button>
           </div>
         </form>
