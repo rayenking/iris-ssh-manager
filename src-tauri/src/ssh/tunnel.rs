@@ -230,11 +230,21 @@ impl TunnelManager {
     ) -> Result<String> {
         let bound_port = {
             let mut handle = self.handle.lock().await;
-            handle
-                .tcpip_forward("", u32::from(remote_port))
-                .await
-                .with_context(|| format!("failed to create remote forward on port {remote_port} — the SSH server may have AllowTcpForwarding or GatewayPorts disabled"))?
-                as u16
+            match handle.tcpip_forward("0.0.0.0", u32::from(remote_port)).await {
+                Ok(port) => port as u16,
+                Err(first_err) => {
+                    eprintln!("[tunnel] tcpip_forward(0.0.0.0, {remote_port}) failed: {first_err:?}, retrying with localhost");
+                    match handle.tcpip_forward("localhost", u32::from(remote_port)).await {
+                        Ok(port) => port as u16,
+                        Err(second_err) => {
+                            eprintln!("[tunnel] tcpip_forward(localhost, {remote_port}) also failed: {second_err:?}");
+                            return Err(anyhow::anyhow!(
+                                "failed to create remote forward on port {remote_port} — server rejected both 0.0.0.0 and localhost bind addresses. Check AllowTcpForwarding in sshd_config. Error: {first_err}"
+                            ));
+                        }
+                    }
+                }
+            }
         };
 
         let (stop_tx, stop_rx) = oneshot::channel();
@@ -248,7 +258,9 @@ impl TunnelManager {
 
             let cancel_result = {
                 let handle = handle.lock().await;
-                handle.cancel_tcpip_forward("", u32::from(bound_port)).await
+                let r1 = handle.cancel_tcpip_forward("0.0.0.0", u32::from(bound_port)).await;
+                let r2 = handle.cancel_tcpip_forward("localhost", u32::from(bound_port)).await;
+                r1.or(r2)
             };
 
             if let Err(error) = cancel_result {
