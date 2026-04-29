@@ -142,13 +142,7 @@ function App() {
       <Sidebar />
       
       {snippetsOpen && (
-        <div className="w-[300px] border-r border-[var(--color-border)] z-10 flex flex-col bg-[var(--color-bg-secondary)] relative">
-          <button 
-            onClick={toggleSnippets}
-            className="absolute top-4 right-4 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
-          >
-            &times;
-          </button>
+        <div className="w-[300px] border-r border-[var(--color-border)] z-10 flex flex-col bg-[var(--color-bg-secondary)]">
           <SnippetManager />
         </div>
       )}

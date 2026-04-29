@@ -19,7 +19,7 @@ export function SnippetManager() {
   }, [fetchSnippets]);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
-  const activeTerminalTab = activeTab?.kind === 'terminal' ? activeTab : null;
+  const activeTerminalTab = (activeTab?.kind === 'terminal' || activeTab?.kind === 'local-terminal') ? activeTab : null;
 
   const activeConnectionId = activeTerminalTab?.connectionId ?? null;
 
@@ -81,7 +81,11 @@ export function SnippetManager() {
 
       const encoder = new TextEncoder();
       const data = encoder.encode(finalCommand);
-      await tauriApi.sshWrite(activeTerminalTab.sessionId, Array.from(data));
+      if (activeTerminalTab.connectionId === 'local') {
+        await tauriApi.localShellWrite(activeTerminalTab.sessionId, Array.from(data));
+      } else {
+        await tauriApi.sshWrite(activeTerminalTab.sessionId, Array.from(data));
+      }
     } catch (e) {
       console.error('Failed to insert snippet:', e);
     }
