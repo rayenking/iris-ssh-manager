@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g. v0.1.0)'
-        required: true
-        default: 'v0.1.0'
+        description: 'Release tag (e.g. v0.2.0). Leave empty to use latest git tag.'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -107,13 +107,21 @@ jobs:
         with:
           path: artifacts
 
+      - name: Checkout for tag detection
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Determine tag
         id: tag
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.tag }}" ]]; then
             echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
-          else
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
             echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload to GitHub Release
