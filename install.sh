@@ -83,20 +83,24 @@ install_macos() {
     DMG_NAME="$DMG_INTEL"
   fi
 
-  local DMG_URL="https://github.com/$REPO/releases/download/$TAG/$(echo "$DMG_NAME" | sed 's/ /%20/g')"
+  local DMG_URL="https://github.com/$REPO/releases/download/$TAG/${DMG_NAME// /.}"
 
-  info "Downloading $DMG_NAME..."
+  info "Downloading ${DMG_NAME// /.}..."
   if curl -fSL -o "$TMPDIR/iris.dmg" "$DMG_URL" 2>/dev/null; then
     info "Mounting DMG..."
+    local HDIUTIL_OUT
+    HDIUTIL_OUT=$(hdiutil attach "$TMPDIR/iris.dmg" -nobrowse 2>&1)
     local MOUNT_POINT
-    MOUNT_POINT=$(hdiutil attach "$TMPDIR/iris.dmg" -nobrowse | grep '/Volumes/' | sed 's/.*\(\/Volumes\/.*\)/\1/' | head -1)
+    MOUNT_POINT=$(echo "$HDIUTIL_OUT" | grep -o '/Volumes/[^\t]*' | head -1 | sed 's/[[:space:]]*$//')
 
-    if [[ -z "$MOUNT_POINT" ]]; then
+    if [[ -z "$MOUNT_POINT" || ! -d "$MOUNT_POINT" ]]; then
+      echo "$HDIUTIL_OUT" >&2
       error "Failed to mount DMG"
     fi
 
+    info "Mounted at: $MOUNT_POINT"
     local APP
-    APP=$(find "$MOUNT_POINT" -maxdepth 1 -name "*.app" -print -quit)
+    APP=$(find "$MOUNT_POINT" -maxdepth 1 -name "*.app" -print -quit 2>/dev/null)
 
     if [[ -n "$APP" ]]; then
       info "Installing to /Applications..."
@@ -104,6 +108,8 @@ install_macos() {
       hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true
       info "Iris SSH Manager $TAG installed to /Applications!"
     else
+      info "Contents of $MOUNT_POINT:"
+      ls -la "$MOUNT_POINT" 2>/dev/null || true
       hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true
       error "No .app found in DMG"
     fi
