@@ -17,7 +17,7 @@ pub use snippets::{CreateSnippetInput, Snippet, SnippetRepo, UpdateSnippetInput}
 
 pub struct DbState(pub Mutex<Connection>);
 
-const MIGRATIONS: [(&str, &str); 5] = [
+const MIGRATIONS: [(&str, &str); 6] = [
     (
         "001_create_connections.sql",
         include_str!("migrations/001_create_connections.sql"),
@@ -37,6 +37,10 @@ const MIGRATIONS: [(&str, &str); 5] = [
     (
         "005_create_migrations.sql",
         include_str!("migrations/005_create_migrations.sql"),
+    ),
+    (
+        "006_add_snippet_scope.sql",
+        include_str!("migrations/006_add_snippet_scope.sql"),
     ),
 ];
 

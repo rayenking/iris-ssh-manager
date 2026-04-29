@@ -15,8 +15,9 @@ export function Sidebar() {
   };
 
   return (
+    <div className="relative flex h-full">
     <div 
-      className={`flex flex-col h-full bg-[var(--color-bg-secondary)] border-r border-[var(--color-border)] transition-all duration-200 ${
+      className={`flex flex-col h-full bg-[var(--color-bg-secondary)] transition-all duration-200 ${
         sidebarCollapsed ? 'w-12' : 'w-[280px]'
       }`}
     >
@@ -90,7 +91,6 @@ export function Sidebar() {
 
         <div className="flex items-center justify-between">
           {!sidebarCollapsed ? (
-            <>
               <button 
                 onClick={toggleSnippets}
                 className="flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors flex-1"
@@ -98,14 +98,6 @@ export function Sidebar() {
                 <Code className="w-4 h-4" />
                 <span>Snippets</span>
               </button>
-              <button 
-                onClick={toggleSidebar}
-                className="p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors"
-                title="Collapse Sidebar"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-            </>
           ) : (
             <div className="flex flex-col gap-2 w-full items-center">
               <button 
@@ -122,13 +114,6 @@ export function Sidebar() {
               >
                 <Settings className="w-4 h-4" />
               </button>
-              <button 
-                onClick={toggleSidebar}
-                className="p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors w-full flex justify-center"
-                title="Expand Sidebar"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
             </div>
           )}
         </div>
@@ -144,6 +129,16 @@ export function Sidebar() {
           </button>
         )}
       </div>
+    </div>
+    <button
+      onClick={toggleSidebar}
+      className="w-3 h-full flex items-center justify-center border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:bg-[var(--color-hover)] transition-colors group cursor-col-resize shrink-0"
+      title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+    >
+      <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--color-text-muted)]">
+        {sidebarCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+      </div>
+    </button>
     </div>
   );
 }
