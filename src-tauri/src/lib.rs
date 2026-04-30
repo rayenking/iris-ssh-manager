@@ -13,6 +13,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             let app_data_dir = app
                 .path()
@@ -89,7 +91,10 @@ pub fn run() {
             commands::updater::check_for_updates,
             commands::updater::get_current_version,
             commands::updater::download_update,
-            commands::updater::install_update
+            commands::updater::install_update,
+            commands::backup::export_data,
+            commands::backup::preview_import,
+            commands::backup::import_data
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

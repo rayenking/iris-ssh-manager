@@ -510,4 +510,14 @@ export const tauriApi = {
 
   getAllSettings: (): Promise<Record<string, string>> =>
     isTauriRuntime() ? invoke('get_all_settings') : Promise.resolve(readAllFallbackSettings()),
+
+  // Backup
+  exportData: (includePasswords: boolean, passphrase?: string): Promise<string> =>
+    invoke('export_data', { includePasswords, passphrase: passphrase || null }),
+
+  previewImport: (data: string): Promise<{ connectionsCount: number; groupsCount: number; snippetsCount: number; settingsCount: number; hasCredentials: boolean }> =>
+    invoke('preview_import', { data }),
+
+  importData: (data: string, passphrase: string | null, importConnections: boolean, importSnippets: boolean, importSettings: boolean): Promise<string> =>
+    invoke('import_data', { data, passphrase, importConnections, importSnippets, importSettings }),
 };

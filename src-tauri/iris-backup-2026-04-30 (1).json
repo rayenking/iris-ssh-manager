@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "exportedAt": "2026-04-30T15:01:03.240902356+00:00",
+  "connections": [
+    {
+      "id": "8484251c-6765-4839-9b67-c6e6b765cff6",
+      "name": "Luffy Zoro",
+      "hostname": "103.150.100.193",
+      "port": 22,
+      "username": "mugiwara",
+      "authMethod": "password",
+      "privateKeyPath": null,
+      "groupId": null,
+      "colorTag": null,
+      "startupCommand": null,
+      "lastConnectedAt": null,
+      "connectionCount": 0,
+      "sortOrder": 0,
+      "createdAt": "2026-04-28T01:57:46.122Z",
+      "updatedAt": "2026-04-28T13:47:46.621Z"
+    },
+    {
+      "id": "089df8ed-8f8a-4945-bc56-85b0e37646e7",
+      "name": "Zate",
+      "hostname": "10.10.10.242",
+      "port": 22,
+      "username": "zate",
+      "authMethod": "password",
+      "privateKeyPath": null,
+      "groupId": null,
+      "colorTag": null,
+      "startupCommand": null,
+      "lastConnectedAt": null,
+      "connectionCount": 0,
+      "sortOrder": 1,
+      "createdAt": "2026-04-27T13:22:57.655Z",
+      "updatedAt": "2026-04-28T13:47:46.626Z"
+    },
+    {
+      "id": "837dae52-6276-44e7-a38a-db383687f8d3",
+      "name": "Propam",
+      "hostname": "103.150.100.193",
+      "port": 22,
+      "username": "rayenking",
+      "authMethod": "password",
+      "privateKeyPath": null,
+      "groupId": null,
+      "colorTag": null,
+      "startupCommand": null,
+      "lastConnectedAt": null,
+      "connectionCount": 0,
+      "sortOrder": 2,
+      "createdAt": "2026-04-28T05:43:48.623Z",
+      "updatedAt": "2026-04-28T13:47:46.629Z"
+    }
+  ],
+  "groups": [],
+  "snippets": [
+    {
+      "id": "d5e8f1d0-21ee-4573-a083-008e8a4bd158",
+      "name": "OS Check",
+      "command": "uname -a",
+      "category": "System",
+      "variables": null,
+      "sortOrder": null,
+      "scope": "global",
+      "connectionIds": null
+    },
+    {
+      "id": "7a027e81-c83e-484d-92fb-b96f438428e4",
+      "name": "Photobooth Deploy Status",
+      "command": "cd ~/photobooth && ./photobooth deploy-status",
+      "category": "Photobooth",
+      "variables": null,
+      "sortOrder": null,
+      "scope": "connections",
+      "connectionIds": "[\"8484251c-6765-4839-9b67-c6e6b765cff6\"]"
+    }
+  ],
+  "settings": {
+    "keybindings": "{\"command-palette\":\"Ctrl+k\",\"new-connection\":\"Ctrl+n\",\"close-tab\":\"Ctrl+w\",\"open-settings\":\"Ctrl+,\",\"toggle-snippets\":\"Ctrl+Shift+s\",\"open-import-config\":\"Ctrl+Shift+i\",\"open-sftp\":\"Ctrl+Shift+o\"}",
+    "terminalFontSize": "14",
+    "cursorStyle": "block",
+    "theme": "iris-pink",
+    "uiFontSize": "14",
+    "terminalFont": "monospace",
+    "sidebarDefaultState": "expanded",
+    "scrollbackBuffer": "5000",
+    "autoReconnect": "true",
+    "cursorBlink": "true",
+    "bell": "visual"
+  },
+  "credentials": "LOP2kLZNO6F2lraLZASVB8BItLOGqDOFqIfQ1iifT27AeiITv4XNneJ7tkWNxuSlxDk/SzLJF4Gw2foaFX+zkGXO/6C0abJXGRt8wPonQPOJPtWvVZj2Gkrf3IYZ3Z7szPx95yaDwAzequv+zpRWjmcBDCerLoUWcYsBiIR0NL9s6lZhRnzNZAmY3dSWCUmZ4bK9UAbBPuxUYZqlXp/I+ex6p5mZ5111FueWmjjTKh733eSSKN8Muhxuyct971cKL3m9kKbENQLCSlwI"
+}

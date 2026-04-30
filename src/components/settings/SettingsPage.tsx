@@ -3,15 +3,17 @@ import { AppearanceSettings } from './AppearanceSettings';
 import { ConnectionsSettings } from './ConnectionsSettings';
 import { TerminalSettings } from './TerminalSettings';
 import { KeybindSettings } from './KeybindSettings';
+import { BackupSettings } from './BackupSettings';
 import { useUiStore } from '../../stores/uiStore';
 
-type SettingsTab = 'appearance' | 'terminal' | 'connections' | 'keybindings';
+type SettingsTab = 'appearance' | 'terminal' | 'connections' | 'keybindings' | 'backup';
 
 const tabs: Array<{ id: SettingsTab; label: string }> = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'terminal', label: 'Terminal' },
   { id: 'connections', label: 'Connections' },
   { id: 'keybindings', label: 'Keybindings' },
+  { id: 'backup', label: 'Backup' },
 ];
 
 export function SettingsPage() {
@@ -46,11 +48,11 @@ export function SettingsPage() {
       return <ConnectionsSettings />;
     }
 
-    return (
-      <div className="rounded border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4 text-sm text-[var(--color-text-muted)]">
-        Connection settings stay tied to the existing connection editor for now.
-      </div>
-    );
+    if (activeTab === 'backup') {
+      return <BackupSettings />;
+    }
+
+    return null;
   }, [activeTab]);
 
   return (
