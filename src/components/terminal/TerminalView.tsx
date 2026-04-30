@@ -431,9 +431,9 @@ export function TerminalView({
   }, [connectionState, emitSessionChange, emitStatusChange, reportTabState]);
 
   return (
-    <div ref={containerRef} data-pane-id={paneId} className="relative flex h-full w-full min-h-0 flex-1 bg-[var(--color-bg-primary)]">
+    <div ref={containerRef} data-pane-id={paneId} className="relative flex h-full w-full min-h-0 flex-1 bg-[var(--color-terminal-bg)]">
       <div className="relative flex-1 min-w-0 flex flex-col h-full">
-        <div ref={terminalHostRef} className="flex-1 min-h-0 overflow-hidden px-1 py-1" />
+        <div ref={terminalHostRef} className="flex-1 min-h-0 overflow-hidden px-2 py-2" />
 
         {connectionState === 'connected' && (
           <button
