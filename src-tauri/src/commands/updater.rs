@@ -174,18 +174,34 @@ pub async fn install_update(app: tauri::AppHandle, file_path: String) -> Result<
         return Err("Update file not found".to_string());
     }
 
+    let current_exe = std::env::current_exe()
+        .map_err(|e| format!("Cannot find current exe: {e}"))?;
+    let exe_path = current_exe.to_string_lossy().to_string();
+
     #[cfg(target_os = "linux")]
     {
         if file_path.ends_with(".deb") {
-            std::process::Command::new("pkexec")
+            let status = std::process::Command::new("pkexec")
                 .args(["dpkg", "-i", &file_path])
-                .spawn()
+                .status()
                 .map_err(|e| format!("Failed to install: {e}"))?;
+
+            if !status.success() {
+                return Err("dpkg install failed — you may need to run on a Debian-based system".to_string());
+            }
+
+            std::process::Command::new(&exe_path)
+                .spawn()
+                .map_err(|e| format!("Failed to restart app: {e}"))?;
         } else if file_path.ends_with(".AppImage") {
-            let current_exe =
-                std::env::current_exe().map_err(|e| format!("Cannot find current exe: {e}"))?;
+            std::fs::set_permissions(&path, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+                .map_err(|e| format!("Failed to set permissions: {e}"))?;
             std::fs::copy(&path, &current_exe)
                 .map_err(|e| format!("Failed to replace binary: {e}"))?;
+
+            std::process::Command::new(&exe_path)
+                .spawn()
+                .map_err(|e| format!("Failed to restart app: {e}"))?;
         } else {
             return Err("Unsupported update format".to_string());
         }
@@ -208,7 +224,7 @@ pub async fn install_update(app: tauri::AppHandle, file_path: String) -> Result<
     }
 
     std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        std::thread::sleep(std::time::Duration::from_secs(2));
         app.exit(0);
     });
 

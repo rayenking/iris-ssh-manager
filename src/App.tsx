@@ -182,12 +182,16 @@ function App() {
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
-            <div className="text-[var(--color-text-muted)] text-center flex flex-col items-center gap-4">
-              <h1 className="text-2xl font-light tracking-wide text-[var(--color-text-secondary)]">
-                Welcome to Iris
-              </h1>
+            <div className="text-[var(--color-text-muted)] text-center flex flex-col items-center gap-6">
+              <img src="/assets/cover.png" alt="Iris SSH Manager" className="max-w-md w-full rounded-lg opacity-90" draggable={false} />
+              <div className="flex flex-col items-center gap-2">
+                <img src="/assets/logo.png" alt="" className="h-10 w-10" draggable={false} />
+                <h1 className="text-2xl font-light tracking-wide text-[var(--color-text-secondary)]">
+                  Welcome to Iris
+                </h1>
+              </div>
               <p className="text-sm">Select a connection to start</p>
-              <p className="text-xs opacity-50 mt-4">Press Ctrl+K or Cmd+K for command palette</p>
+              <p className="text-xs opacity-50">Press Ctrl+K or Cmd+K for command palette</p>
             </div>
           </div>
         )}

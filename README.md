@@ -1,12 +1,26 @@
-# Iris SSH Manager
+<p align="center">
+  <img src=".github/assets/logo.png" alt="Iris SSH Manager" width="80" />
+</p>
 
-A modern, cross-platform SSH client and connection manager built with **Tauri 2.0** + **Rust** + **React** + **TypeScript** + **Tailwind CSS v4**.
+<h1 align="center">Iris SSH Manager</h1>
 
-Personal alternative to Termius / Bitvise SSH Client — fast, lightweight, and fully open source.
+<p align="center">
+  A modern, cross-platform SSH client and connection manager built with <b>Tauri 2.0</b> + <b>Rust</b> + <b>React</b> + <b>TypeScript</b> + <b>Tailwind CSS v4</b>.
+</p>
 
-![License](https://img.shields.io/github/license/rayenking/iris-ssh-manager)
-![Release](https://img.shields.io/github/v/release/rayenking/iris-ssh-manager)
-![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue)
+<p align="center">
+  Personal alternative to Termius / Bitvise SSH Client — fast, lightweight, and fully open source.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/github/license/rayenking/iris-ssh-manager" alt="License" />
+  <img src="https://img.shields.io/github/v/release/rayenking/iris-ssh-manager" alt="Release" />
+  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue" alt="Platform" />
+</p>
+
+<p align="center">
+  <img src=".github/assets/cover.png" alt="Iris SSH Manager Preview" width="720" />
+</p>
 
 ## Features
 
