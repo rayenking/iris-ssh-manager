@@ -2,8 +2,12 @@
 @import "./styles/themes/dark-minimal.css";
 @import "./styles/themes/iris-pink.css";
 
-:root {
+[data-theme="dark-minimal"] {
   color-scheme: dark;
+}
+
+[data-theme="iris-pink"] {
+  color-scheme: light;
 }
 
 select,
