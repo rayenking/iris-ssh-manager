@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Internal planning/dev files
+.sisyphus/
+.issue/
+dev.log
