@@ -164,6 +164,9 @@ export function TerminalView({
         } else if (trimmed === 'cd') {
           lastCwdRef.current = null;
         }
+        if (lastCwdRef.current) {
+          useTerminalStore.getState().setTabCwd(tabId, lastCwdRef.current);
+        }
         inputBuffer = '';
       } else if (value === '\x7f') {
         inputBuffer = inputBuffer.slice(0, -1);
@@ -251,7 +254,7 @@ export function TerminalView({
       terminalRef.current = null;
       fitAddonRef.current = null;
     };
-  }, [attachCopyPaste, resize, write]);
+  }, [attachCopyPaste, resize, tabId, write]);
 
   useEffect(() => {
     const terminal = terminalRef.current;
@@ -320,6 +323,7 @@ export function TerminalView({
         const osc7Match = text.match(/\x1b\]7;file:\/\/[^/]*(\/[^\x07\x1b]*)/);
         if (osc7Match?.[1]) {
           lastCwdRef.current = decodeURIComponent(osc7Match[1]);
+          useTerminalStore.getState().setTabCwd(tabId, lastCwdRef.current);
         }
       }, initialCols, initialRows);
 

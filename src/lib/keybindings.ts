@@ -13,6 +13,7 @@ const defaultRegistry: KeybindingRegistry = {
   'close-tab': { combo: 'Ctrl+w' },
   'open-settings': { combo: 'Ctrl+,' },
   'toggle-snippets': { combo: 'Ctrl+Shift+s' },
+  'toggle-explorer': { combo: 'Ctrl+e' },
   'open-import-config': { combo: 'Ctrl+Shift+i' },
   'open-sftp': { combo: 'Ctrl+Shift+o' },
   'local-terminal': { combo: 'Ctrl+Shift+t' },

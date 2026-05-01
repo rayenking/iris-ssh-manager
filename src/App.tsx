@@ -9,6 +9,7 @@ import { SplitContainer } from "./components/terminal/SplitContainer";
 import { CommandPalette } from "./components/layout/CommandPalette";
 import { SnippetManager } from "./components/snippets/SnippetManager";
 import { ImportDialog } from "./components/connections/ImportDialog";
+import { FileExplorer } from "./components/explorer/FileExplorer";
 import { useUiStore } from "./stores/uiStore";
 import { useTerminalStore } from "./stores/terminalStore";
 import { useSplitStore } from "./stores/splitStore";
@@ -21,7 +22,18 @@ import { UpdateNotification } from "./components/layout/UpdateNotification";
 import { TitleBar } from "./components/layout/TitleBar";
 
 function App() {
-  const { currentTheme, snippetsOpen, toggleSnippets, importDialogOpen, setImportDialogOpen, settingsOpen, toggleCommandPalette, setSidebarCollapsed } = useUiStore();
+  const {
+    currentTheme,
+    snippetsOpen,
+    explorerOpen,
+    toggleExplorer,
+    toggleSnippets,
+    importDialogOpen,
+    setImportDialogOpen,
+    settingsOpen,
+    toggleCommandPalette,
+    setSidebarCollapsed,
+  } = useUiStore();
   const { tabs, activeTabId } = useTerminalStore();
   const splitTrees = useSplitStore((state) => state.splitTrees);
   const { loadSettings, keybindings, sidebarDefaultState, theme } = useSettingsStore();
@@ -70,6 +82,12 @@ function App() {
 
     return () => unregisterShortcut('toggle-snippets');
   }, [toggleSnippets]);
+
+  useEffect(() => {
+    registerShortcut('toggle-explorer', toggleExplorer);
+
+    return () => unregisterShortcut('toggle-explorer');
+  }, [toggleExplorer]);
 
   useEffect(() => {
     const handleOpenImportConfig = () => {
@@ -147,6 +165,12 @@ function App() {
       {snippetsOpen && (
         <div className="w-[300px] border-r border-[var(--color-border)] z-10 flex flex-col bg-[var(--color-bg-secondary)]">
           <SnippetManager />
+        </div>
+      )}
+
+      {explorerOpen && (
+        <div className="w-[280px] border-r border-[var(--color-border)] z-10 flex flex-col bg-[var(--color-bg-secondary)]">
+          <FileExplorer />
         </div>
       )}
 

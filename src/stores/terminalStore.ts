@@ -7,6 +7,7 @@ type TerminalLikeTab = TerminalTab | LocalTerminalTab;
 interface TerminalState {
   tabs: AppTab[];
   activeTabId: string | null;
+  tabCwds: Record<string, string>;
 
   openTab: (connectionId: string, title: string) => void;
   openLocalTab: () => void;
@@ -16,6 +17,7 @@ interface TerminalState {
   reorderTabs: (fromIndex: number, toIndex: number) => void;
   updateTabStatus: (id: string, status: TabStatus) => void;
   setTabSessionId: (id: string, sessionId?: string) => void;
+  setTabCwd: (tabId: string, cwd: string) => void;
 }
 
 function isTerminalTab(tab: AppTab): tab is TerminalLikeTab {
@@ -25,6 +27,7 @@ function isTerminalTab(tab: AppTab): tab is TerminalLikeTab {
 export const useTerminalStore = create<TerminalState>((set) => ({
   tabs: [],
   activeTabId: null,
+  tabCwds: {},
 
   openTab: (connectionId, title) => {
     const newTab: TerminalTab = {
@@ -104,6 +107,10 @@ export const useTerminalStore = create<TerminalState>((set) => ({
       }
 
       const newTabs = state.tabs.filter((tab) => !tabsToRemove.has(tab.id));
+      const tabCwds = { ...state.tabCwds };
+      tabsToRemove.forEach((tabId) => {
+        delete tabCwds[tabId];
+      });
       const activeTabRemoved = state.activeTabId ? tabsToRemove.has(state.activeTabId) : false;
       const nextActiveTabId = activeTabRemoved
         ? newTabs.length > 0
@@ -123,6 +130,7 @@ export const useTerminalStore = create<TerminalState>((set) => ({
       return {
         tabs: newTabs,
         activeTabId: nextActiveTabId,
+        tabCwds,
       };
     });
   },
@@ -149,6 +157,15 @@ export const useTerminalStore = create<TerminalState>((set) => ({
   setTabSessionId: (id, sessionId) => {
     set((state) => ({
       tabs: state.tabs.map((tab) => (isTerminalTab(tab) && tab.id === id ? { ...tab, sessionId } : tab)),
+    }));
+  },
+
+  setTabCwd: (tabId, cwd) => {
+    set((state) => ({
+      tabCwds: {
+        ...state.tabCwds,
+        [tabId]: cwd,
+      },
     }));
   },
 

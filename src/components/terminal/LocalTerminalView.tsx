@@ -50,6 +50,7 @@ export function LocalTerminalView({
   const fitAddonRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const encoderRef = useRef(new TextEncoder());
+  const lastCwdRef = useRef<string | null>(null);
   const statusChangeRef = useRef<(status: TabStatus) => void>(() => {});
   const sessionChangeRef = useRef<(sessionId?: string) => void>(() => {});
   const { open, close, write, resize, connectionState, error } = useLocalShell();
@@ -126,11 +127,38 @@ export function LocalTerminalView({
       fitAddon.fit();
     });
 
+    let inputBuffer = '';
+
     const handleTerminalData = terminal.onData((value) => {
       const sessionId = sessionIdRef.current;
 
       if (!sessionId) {
         return;
+      }
+
+      if (value === '\r' || value === '\n') {
+        const trimmed = inputBuffer.trim();
+        const cdMatch = trimmed.match(/^cd\s+(.+)/);
+        if (cdMatch) {
+          const target = cdMatch[1].replace(/^~/, '$HOME').replace(/["']/g, '');
+          if (target.startsWith('/')) {
+            lastCwdRef.current = target;
+          } else if (target !== '-' && lastCwdRef.current) {
+            lastCwdRef.current = lastCwdRef.current.replace(/\/$/, '') + '/' + target;
+          }
+        } else if (trimmed === 'cd') {
+          lastCwdRef.current = null;
+        }
+
+        if (lastCwdRef.current) {
+          useTerminalStore.getState().setTabCwd(tabId, lastCwdRef.current);
+        }
+
+        inputBuffer = '';
+      } else if (value === '\x7f') {
+        inputBuffer = inputBuffer.slice(0, -1);
+      } else if (value.length === 1 && value >= ' ') {
+        inputBuffer += value;
       }
 
       const data = Array.from(encoderRef.current.encode(value));
@@ -203,7 +231,7 @@ export function LocalTerminalView({
       terminalRef.current = null;
       fitAddonRef.current = null;
     };
-  }, [attachCopyPaste, resize, write]);
+  }, [attachCopyPaste, resize, tabId, write]);
 
   useEffect(() => {
     const terminal = terminalRef.current;
@@ -271,7 +299,15 @@ export function LocalTerminalView({
           return;
         }
 
-        terminalRef.current?.write(new Uint8Array(data));
+        const bytes = new Uint8Array(data);
+        terminalRef.current?.write(bytes);
+
+        const text = new TextDecoder().decode(bytes);
+        const osc7Match = text.match(/\x1b\]7;file:\/\/[^/]*(\/[^\x07\x1b]*)/);
+        if (osc7Match?.[1]) {
+          lastCwdRef.current = decodeURIComponent(osc7Match[1]);
+          useTerminalStore.getState().setTabCwd(tabId, lastCwdRef.current);
+        }
       });
 
       sessionIdRef.current = sessionId;
@@ -293,7 +329,7 @@ export function LocalTerminalView({
     } catch (openError) {
       console.error('Failed to start local terminal:', openError);
     }
-  }, [emitSessionChange, emitStatusChange, open, resize]);
+  }, [emitSessionChange, emitStatusChange, open, resize, tabId]);
 
   useEffect(() => {
     void doOpen();
