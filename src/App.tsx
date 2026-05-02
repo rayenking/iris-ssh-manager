@@ -225,11 +225,7 @@ function App() {
         <StatusBar />
         </div>
 
-        {editorFile && (
-          <div className="w-[400px] border-l border-[var(--color-border)] flex flex-col bg-[var(--color-bg-secondary)]">
-            <FileEditor />
-          </div>
-        )}
+        {editorFile && <FileEditor />}
       </div>
        
       </div>
