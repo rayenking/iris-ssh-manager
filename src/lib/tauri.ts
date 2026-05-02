@@ -425,6 +425,16 @@ export const tauriApi = {
       ? invoke('sftp_realpath', { sessionId, path })
       : Promise.resolve(path),
 
+  sftpReadFile: (sessionId: string, path: string): Promise<string> =>
+    isTauriRuntime()
+      ? invoke('sftp_read_file', { sessionId, path })
+      : Promise.reject(new Error('SFTP file reading is only available in the Tauri app.')),
+
+  sftpWriteFile: (sessionId: string, path: string, content: string): Promise<void> =>
+    isTauriRuntime()
+      ? invoke('sftp_write_file', { sessionId, path, content })
+      : Promise.reject(new Error('SFTP file writing is only available in the Tauri app.')),
+
   sftpDownload: (
     sessionId: string,
     remotePath: string,
@@ -459,6 +469,16 @@ export const tauriApi = {
 
   localListDir: (path: string): Promise<FileEntry[]> =>
     isTauriRuntime() ? invoke('local_list_dir', { path }) : Promise.resolve([]),
+
+  localReadFile: (path: string): Promise<string> =>
+    isTauriRuntime()
+      ? invoke('local_read_file', { path })
+      : Promise.reject(new Error('Local file reading is only available in the Tauri app.')),
+
+  localWriteFile: (path: string, content: string): Promise<void> =>
+    isTauriRuntime()
+      ? invoke('local_write_file', { path, content })
+      : Promise.reject(new Error('Local file writing is only available in the Tauri app.')),
 
   localDelete: (path: string): Promise<void> =>
     isTauriRuntime() ? invoke('local_delete', { path }) : Promise.resolve(),

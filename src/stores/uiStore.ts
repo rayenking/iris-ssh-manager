@@ -2,6 +2,12 @@ import { create } from 'zustand';
 
 type Theme = 'dark-minimal' | 'iris-pink';
 
+interface EditorFile {
+  path: string;
+  sessionId?: string;
+  isLocal: boolean;
+}
+
 interface UiState {
   sidebarCollapsed: boolean;
   commandPaletteOpen: boolean;
@@ -11,6 +17,7 @@ interface UiState {
   settingsOpen: boolean;
   currentTheme: Theme;
   errorToast: string | null;
+  editorFile: EditorFile | null;
 
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
@@ -21,6 +28,7 @@ interface UiState {
   setImportDialogOpen: (open: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
   setTheme: (theme: Theme) => void;
+  setEditorFile: (file: EditorFile | null) => void;
   showErrorToast: (message: string) => void;
   clearErrorToast: () => void;
 }
@@ -34,6 +42,7 @@ export const useUiStore = create<UiState>((set) => ({
   settingsOpen: false,
   currentTheme: 'dark-minimal',
   errorToast: null,
+  editorFile: null,
 
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 
@@ -59,6 +68,8 @@ export const useUiStore = create<UiState>((set) => ({
   setImportDialogOpen: (open) => set({ importDialogOpen: open }),
 
   setSettingsOpen: (open) => set({ settingsOpen: open }),
+
+  setEditorFile: (file) => set({ editorFile: file }),
   
   setTheme: (theme) => {
     document.documentElement.setAttribute('data-theme', theme);

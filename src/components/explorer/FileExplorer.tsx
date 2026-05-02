@@ -1,8 +1,9 @@
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
-import { ChevronRight, File as FileIcon, Folder, FolderTree, RefreshCw } from 'lucide-react';
+import { ChevronRight, Eye, EyeOff, File as FileIcon, Folder, FolderTree, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { tauriApi } from '../../lib/tauri';
 import { useTerminalStore } from '../../stores/terminalStore';
+import { useUiStore } from '../../stores/uiStore';
 import type { FileEntry } from '../../types/sftp';
 
 interface TreeNode {
@@ -25,6 +26,7 @@ function isTauriRuntime() {
 
 export function FileExplorer() {
   const { activeTabId, tabs, tabCwds, setTabCwd, openFileBrowserTab } = useTerminalStore();
+  const setEditorFile = useUiStore((state) => state.setEditorFile);
   const activeTab = useMemo(
     () => tabs.find((tab) => tab.id === activeTabId) ?? null,
     [activeTabId, tabs],
@@ -38,6 +40,7 @@ export function FileExplorer() {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [loadingPath, setLoadingPath] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
   const hasTerminalTab = activeTab?.kind === 'terminal' || activeTab?.kind === 'local-terminal';
@@ -180,6 +183,25 @@ export function FileExplorer() {
     }
   }, []);
 
+  const handleOpenFile = useCallback(async (path: string) => {
+    if (isBinaryFile(path)) {
+      await handleCopyPath(path);
+      return;
+    }
+
+    if (activeTab?.kind === 'local-terminal') {
+      setEditorFile({ path, isLocal: true, sessionId: activeTab.sessionId });
+      return;
+    }
+
+    if (activeTab?.kind === 'terminal' && activeTab.sessionId) {
+      setEditorFile({ path, isLocal: false, sessionId: activeTab.sessionId });
+      return;
+    }
+
+    await handleCopyPath(path);
+  }, [activeTab, handleCopyPath, setEditorFile]);
+
   const handleCdToPath = useCallback(async (path: string) => {
     if (!activeTabId || !activeTab) {
       return;
@@ -214,10 +236,13 @@ export function FileExplorer() {
   }, [activeTab, openFileBrowserTab]);
 
   const rootKey = activeCwd || '.';
-  const rootEntries = directoryMap[rootKey] ?? [];
+  const rootEntries = useMemo(
+    () => filterEntries(directoryMap[rootKey] ?? [], showHidden),
+    [directoryMap, rootKey, showHidden],
+  );
   const treeNodes = useMemo(
-    () => buildTreeNodes(rootEntries, rootKey, expandedPaths, directoryMap),
-    [rootKey, directoryMap, expandedPaths, rootEntries],
+    () => buildTreeNodes(rootEntries, rootKey, expandedPaths, directoryMap, showHidden),
+    [rootKey, directoryMap, expandedPaths, rootEntries, showHidden],
   );
   if (!hasTerminalTab) {
     return (
@@ -225,6 +250,8 @@ export function FileExplorer() {
         <ExplorerHeader
           pathLabel="Explorer"
           onRefresh={undefined}
+          showHidden={showHidden}
+          onToggleShowHidden={() => setShowHidden((current) => !current)}
           onOpenSftp={undefined}
           openSftpDisabled
         />
@@ -240,6 +267,8 @@ export function FileExplorer() {
       <ExplorerHeader
         pathLabel={formatPathLabel(activeCwd)}
         onRefresh={canBrowse ? () => void handleRefresh() : undefined}
+        showHidden={showHidden}
+        onToggleShowHidden={() => setShowHidden((current) => !current)}
         onOpenSftp={canBrowseRemote ? handleOpenSftp : undefined}
         openSftpDisabled={!canBrowseRemote}
       />
@@ -272,7 +301,7 @@ export function FileExplorer() {
 
           {treeNodes.map((node) => {
             const isExpanded = expandedPaths.has(node.path);
-            const childEntries = directoryMap[node.path] ?? [];
+            const childEntries = filterEntries(directoryMap[node.path] ?? [], showHidden);
             const isLoadingChildren = loadingPath === node.path;
 
             return (
@@ -302,7 +331,7 @@ export function FileExplorer() {
                   <button
                     type="button"
                     className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left"
-                    onClick={() => void (node.entry.isDir ? handleCdToPath(node.path) : handleCopyPath(node.path))}
+                    onClick={() => void (node.entry.isDir ? handleCdToPath(node.path) : handleOpenFile(node.path))}
                     title={node.path}
                   >
                     {node.entry.isDir ? (
@@ -368,11 +397,15 @@ export function FileExplorer() {
 function ExplorerHeader({
   pathLabel,
   onRefresh,
+  showHidden,
+  onToggleShowHidden,
   onOpenSftp,
   openSftpDisabled,
 }: {
   pathLabel: string;
   onRefresh?: () => void;
+  showHidden: boolean;
+  onToggleShowHidden: () => void;
   onOpenSftp?: () => void;
   openSftpDisabled: boolean;
 }) {
@@ -395,6 +428,15 @@ function ExplorerHeader({
         title="Refresh"
       >
         <RefreshCw className="h-4 w-4" />
+      </button>
+
+      <button
+        type="button"
+        className="rounded p-1.5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+        onClick={onToggleShowHidden}
+        title={showHidden ? 'Hide hidden files' : 'Show hidden files'}
+      >
+        {showHidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
       </button>
 
       <button
@@ -428,6 +470,7 @@ function buildTreeNodes(
   basePath: string,
   expandedPaths: Set<string>,
   directoryMap: DirectoryMap,
+  showHidden: boolean,
   depth = 0,
 ): TreeNode[] {
   const nodes: TreeNode[] = [];
@@ -437,7 +480,7 @@ function buildTreeNodes(
     nodes.push({ entry, path, depth });
 
     if (entry.isDir && expandedPaths.has(path)) {
-      nodes.push(...buildTreeNodes(directoryMap[path] ?? [], path, expandedPaths, directoryMap, depth + 1));
+      nodes.push(...buildTreeNodes(filterEntries(directoryMap[path] ?? [], showHidden), path, expandedPaths, directoryMap, showHidden, depth + 1));
     }
   }
 
@@ -526,3 +569,57 @@ function formatBytes(bytes: number) {
 function shellEscape(value: string) {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
+
+function filterEntries(entries: FileEntry[], showHidden: boolean) {
+  if (showHidden) {
+    return entries;
+  }
+
+  return entries.filter((entry) => !entry.name.startsWith('.'));
+}
+
+function isBinaryFile(path: string) {
+  const extension = getPathExtension(path);
+
+  return BINARY_FILE_EXTENSIONS.has(extension);
+}
+
+function getPathExtension(path: string) {
+  const fileName = path.split(/[\\/]/).pop() ?? path;
+  const dotIndex = fileName.lastIndexOf('.');
+
+  if (dotIndex === -1) {
+    return '';
+  }
+
+  return fileName.slice(dotIndex).toLowerCase();
+}
+
+const BINARY_FILE_EXTENSIONS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.bmp',
+  '.ico',
+  '.svg',
+  '.mp3',
+  '.mp4',
+  '.avi',
+  '.mov',
+  '.zip',
+  '.tar',
+  '.gz',
+  '.7z',
+  '.rar',
+  '.exe',
+  '.dll',
+  '.so',
+  '.dylib',
+  '.bin',
+  '.pdf',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.eot',
+]);

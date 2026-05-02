@@ -10,6 +10,7 @@ import { CommandPalette } from "./components/layout/CommandPalette";
 import { SnippetManager } from "./components/snippets/SnippetManager";
 import { ImportDialog } from "./components/connections/ImportDialog";
 import { FileExplorer } from "./components/explorer/FileExplorer";
+import { FileEditor } from "./components/explorer/FileEditor";
 import { useUiStore } from "./stores/uiStore";
 import { useTerminalStore } from "./stores/terminalStore";
 import { useSplitStore } from "./stores/splitStore";
@@ -31,6 +32,7 @@ function App() {
     importDialogOpen,
     setImportDialogOpen,
     settingsOpen,
+    editorFile,
     toggleCommandPalette,
     setSidebarCollapsed,
   } = useUiStore();
@@ -174,7 +176,8 @@ function App() {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col h-full min-w-0">
+      <div className="flex-1 flex min-w-0 h-full">
+        <div className="flex-1 flex flex-col h-full min-w-0">
         <TabBar />
         {activeTab ? (
           <div className="relative flex-1 min-h-0 overflow-hidden">
@@ -220,8 +223,15 @@ function App() {
           </div>
         )}
         <StatusBar />
+        </div>
+
+        {editorFile && (
+          <div className="w-[400px] border-l border-[var(--color-border)] flex flex-col bg-[var(--color-bg-secondary)]">
+            <FileEditor />
+          </div>
+        )}
       </div>
-      
+       
       </div>
       <ImportDialog isOpen={importDialogOpen} onClose={() => setImportDialogOpen(false)} />
       {settingsOpen && <SettingsPage />}

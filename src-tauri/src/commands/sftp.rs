@@ -40,6 +40,31 @@ pub async fn sftp_realpath(
 }
 
 #[tauri::command]
+pub async fn sftp_read_file(
+    pool: State<'_, SshPool>,
+    session_id: String,
+    path: String,
+) -> Result<String, String> {
+    let sftp = open_sftp(&pool, &session_id).await?;
+    let bytes = sftp.read_file(&path).await.map_err(|error| error.to_string())?;
+
+    String::from_utf8(bytes).map_err(|_| "File is not a text file".to_string())
+}
+
+#[tauri::command]
+pub async fn sftp_write_file(
+    pool: State<'_, SshPool>,
+    session_id: String,
+    path: String,
+    content: String,
+) -> Result<(), String> {
+    let sftp = open_sftp(&pool, &session_id).await?;
+    sftp.write_file(&path, content.as_bytes())
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub async fn sftp_download(
     pool: State<'_, SshPool>,
     session_id: String,
@@ -169,6 +194,22 @@ pub async fn local_list_dir(path: String) -> Result<Vec<FileEntry>, String> {
     list_local_dir(&resolved_path)
         .await
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn local_read_file(path: String) -> Result<String, String> {
+    let resolved_path = resolve_local_path(&path)?;
+    tokio::fs::read_to_string(&resolved_path)
+        .await
+        .map_err(|error| format!("failed to read file {}: {error}", resolved_path.display()))
+}
+
+#[tauri::command]
+pub async fn local_write_file(path: String, content: String) -> Result<(), String> {
+    let resolved_path = resolve_local_path(&path)?;
+    tokio::fs::write(&resolved_path, content)
+        .await
+        .map_err(|error| format!("failed to write file {}: {error}", resolved_path.display()))
 }
 
 #[tauri::command]
