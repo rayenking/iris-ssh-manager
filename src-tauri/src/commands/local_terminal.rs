@@ -49,14 +49,30 @@ impl LocalShellSession {
     }
 
     fn get_cwd(&self) -> Option<String> {
-        #[cfg(unix)]
+        let pid = self.child_pid?;
+
+        #[cfg(target_os = "linux")]
         {
-            let pid = self.child_pid?;
             let link = format!("/proc/{pid}/cwd");
             std::fs::read_link(&link).ok().map(|p| p.to_string_lossy().into_owned())
         }
+
+        #[cfg(target_os = "macos")]
+        {
+            let output = std::process::Command::new("lsof")
+                .args(["-a", "-p", &pid.to_string(), "-d", "cwd", "-Fn"])
+                .output()
+                .ok()?;
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            stdout
+                .lines()
+                .find(|line| line.starts_with('n'))
+                .map(|line| line[1..].to_string())
+        }
+
         #[cfg(not(unix))]
         {
+            let _ = pid;
             None
         }
     }
@@ -164,7 +180,11 @@ pub async fn local_shell_open(
         .openpty(pty_size(cols, rows))
         .map_err(|error| error.to_string())?;
 
-    let command = CommandBuilder::new(default_shell());
+    let mut command = CommandBuilder::new(default_shell());
+    command.env("TERM", "xterm-256color");
+    if let Ok(lang) = env::var("LANG") {
+        command.env("LANG", lang);
+    }
     let child = pair
         .slave
         .spawn_command(command)

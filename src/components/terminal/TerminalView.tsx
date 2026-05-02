@@ -68,7 +68,7 @@ export function TerminalView({
   const [tunnelPanelOpen, setTunnelPanelOpen] = useState(false);
   const { connect, disconnect, write, resize, connectionState, error } = useSSH();
   const { updateTabStatus, setTabSessionId } = useTerminalStore();
-  const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer, autoReconnect } = useSettingsStore();
+  const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer, autoReconnect, theme } = useSettingsStore();
 
   const { copySelection, pasteClipboard, hasSelection, attach: attachCopyPaste } = useTerminalCopyPaste({
     terminalRef,
@@ -253,10 +253,17 @@ export function TerminalView({
     terminal.options.fontFamily = terminalFont;
     terminal.options.fontSize = terminalFontSize;
     terminal.options.scrollback = scrollbackBuffer;
-    terminal.options.theme = getTerminalTheme();
-    terminal.refresh(0, terminal.rows - 1);
+
+    // Delay theme read so CSS variables are applied after theme switch
+    requestAnimationFrame(() => {
+      if (terminalRef.current) {
+        terminalRef.current.options.theme = getTerminalTheme();
+        terminalRef.current.refresh(0, terminalRef.current.rows - 1);
+      }
+    });
+
     fitAddon.fit();
-  }, [cursorBlink, cursorStyle, scrollbackBuffer, terminalFont, terminalFontSize]);
+  }, [cursorBlink, cursorStyle, scrollbackBuffer, terminalFont, terminalFontSize, theme]);
 
   // Re-render xterm canvas when this tab becomes active again.
   // WebGL context is lost when the container is hidden (display:none),

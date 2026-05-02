@@ -56,7 +56,7 @@ export function LocalTerminalView({
   const sessionChangeRef = useRef<(sessionId?: string) => void>(() => {});
   const { open, close, write, resize, connectionState, error } = useLocalShell();
   const { updateTabStatus, setTabSessionId, activeTabId: currentActiveTabId } = useTerminalStore();
-  const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer } = useSettingsStore();
+  const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer, theme } = useSettingsStore();
 
   const { copySelection, pasteClipboard, hasSelection, attach: attachCopyPaste } = useTerminalCopyPaste({
     terminalRef,
@@ -245,10 +245,17 @@ export function LocalTerminalView({
     terminal.options.fontFamily = terminalFont;
     terminal.options.fontSize = terminalFontSize;
     terminal.options.scrollback = scrollbackBuffer;
-    terminal.options.theme = getTerminalTheme();
-    terminal.refresh(0, terminal.rows - 1);
+
+    // Delay theme read so CSS variables are applied after theme switch
+    requestAnimationFrame(() => {
+      if (terminalRef.current) {
+        terminalRef.current.options.theme = getTerminalTheme();
+        terminalRef.current.refresh(0, terminalRef.current.rows - 1);
+      }
+    });
+
     fitAddon.fit();
-  }, [cursorBlink, cursorStyle, scrollbackBuffer, terminalFont, terminalFontSize]);
+  }, [cursorBlink, cursorStyle, scrollbackBuffer, terminalFont, terminalFontSize, theme]);
 
   const isActive = currentActiveTabId === tabId;
   const wasActiveRef = useRef(isActive);
