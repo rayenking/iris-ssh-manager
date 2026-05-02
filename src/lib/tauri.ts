@@ -420,6 +420,11 @@ export const tauriApi = {
       ? invoke('sftp_list_dir', { sessionId, path })
       : Promise.resolve([]),
 
+  sftpRealpath: (sessionId: string, path: string): Promise<string> =>
+    isTauriRuntime()
+      ? invoke('sftp_realpath', { sessionId, path })
+      : Promise.resolve(path),
+
   sftpDownload: (
     sessionId: string,
     remotePath: string,

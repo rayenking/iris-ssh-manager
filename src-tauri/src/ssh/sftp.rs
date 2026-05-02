@@ -142,6 +142,13 @@ impl SftpSession {
         Ok(())
     }
 
+    pub async fn realpath(&self, path: &str) -> Result<String> {
+        self.inner
+            .canonicalize(path)
+            .await
+            .with_context(|| format!("failed to resolve remote path: {path}"))
+    }
+
     pub async fn stat(&self, path: &str) -> Result<FileEntry> {
         let metadata = self
             .inner

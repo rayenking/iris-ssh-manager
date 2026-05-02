@@ -64,6 +64,7 @@ pub fn run() {
             commands::tunnel::stop_tunnel,
             commands::tunnel::list_tunnels,
             commands::sftp::sftp_list_dir,
+            commands::sftp::sftp_realpath,
             commands::sftp::sftp_download,
             commands::sftp::sftp_upload,
             commands::sftp::sftp_mkdir,

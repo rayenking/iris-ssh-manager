@@ -111,9 +111,34 @@ export function FileExplorer() {
     setContextMenu(null);
     setError(null);
 
-    if (canBrowse) {
-      void loadDirectory(activeCwd || '.', true);
-    }
+    if (!canBrowse) return;
+
+    const resolveAndLoad = async () => {
+      let root = activeCwd || '.';
+
+      if ((root === '.' || root === '') && canBrowseRemote && activeTab?.kind === 'terminal' && activeTab.sessionId) {
+        try {
+          const resolved = await tauriApi.sftpRealpath(activeTab.sessionId, '.');
+          if (resolved && resolved !== '.') {
+            root = resolved;
+            if (activeTabId) setTabCwd(activeTabId, resolved);
+          }
+        } catch {}
+      }
+
+      if ((root === '' || root === '.') && canBrowseLocal) {
+        try {
+          const homeEntries = await tauriApi.localListDir('');
+          if (homeEntries.length > 0) {
+            root = '';
+          }
+        } catch {}
+      }
+
+      void loadDirectory(root, true);
+    };
+
+    void resolveAndLoad();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCwd, activeTabId, canBrowse]);
 
@@ -194,8 +219,6 @@ export function FileExplorer() {
     () => buildTreeNodes(rootEntries, rootKey, expandedPaths, directoryMap),
     [rootKey, directoryMap, expandedPaths, rootEntries],
   );
-  const parentPath = getParentPath(activeCwd);
-
   if (!hasTerminalTab) {
     return (
       <div className="flex h-full flex-col bg-[var(--color-bg-secondary)]">
@@ -233,14 +256,17 @@ export function FileExplorer() {
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">
-          {activeCwd !== '/' && (
+          {activeCwd && activeCwd !== '/' && (
             <button
               type="button"
               className="flex w-full items-center gap-2 px-3 py-1 text-left text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]"
-              onClick={() => void handleCdToPath('..')}
+              onClick={() => {
+                const parent = getParentPath(activeCwd);
+                void handleCdToPath(parent || '..');
+              }}
             >
               <span className="w-4 shrink-0 text-center">..</span>
-              <span className="truncate">Go up</span>
+              <span className="truncate">{getParentPath(activeCwd) || '..'}</span>
             </button>
           )}
 

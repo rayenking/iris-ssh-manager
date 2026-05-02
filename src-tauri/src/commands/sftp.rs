@@ -30,6 +30,16 @@ pub async fn sftp_list_dir(
 }
 
 #[tauri::command]
+pub async fn sftp_realpath(
+    pool: State<'_, SshPool>,
+    session_id: String,
+    path: String,
+) -> Result<String, String> {
+    let sftp = open_sftp(&pool, &session_id).await?;
+    sftp.realpath(&path).await.map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub async fn sftp_download(
     pool: State<'_, SshPool>,
     session_id: String,
