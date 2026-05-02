@@ -164,17 +164,21 @@ function App() {
       <div className="flex flex-1 min-h-0">
       <Sidebar />
       
-      {snippetsOpen && (
-        <div className="w-[300px] border-r border-[var(--color-border)] z-10 flex flex-col bg-[var(--color-bg-secondary)]">
-          <SnippetManager />
-        </div>
-      )}
+      <div
+        className={`overflow-hidden border-r border-[var(--color-border)] z-10 flex flex-col bg-[var(--color-bg-secondary)] transition-all duration-200 ${
+          snippetsOpen ? 'w-[300px]' : 'w-0 border-r-0'
+        }`}
+      >
+        {snippetsOpen && <SnippetManager />}
+      </div>
 
-      {explorerOpen && (
-        <div className="w-[280px] border-r border-[var(--color-border)] z-10 flex flex-col bg-[var(--color-bg-secondary)]">
-          <FileExplorer />
-        </div>
-      )}
+      <div
+        className={`overflow-hidden border-r border-[var(--color-border)] z-10 flex flex-col bg-[var(--color-bg-secondary)] transition-all duration-200 ${
+          explorerOpen ? 'w-[280px]' : 'w-0 border-r-0'
+        }`}
+      >
+        {explorerOpen && <FileExplorer />}
+      </div>
 
       <div className="flex-1 flex min-w-0 h-full">
         <div className="flex-1 flex flex-col h-full min-w-0">
