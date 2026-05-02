@@ -233,11 +233,11 @@ export function FileExplorer() {
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">
-          {parentPath && (
+          {activeCwd !== '/' && (
             <button
               type="button"
               className="flex w-full items-center gap-2 px-3 py-1 text-left text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]"
-              onClick={() => void handleCdToPath(parentPath)}
+              onClick={() => void handleCdToPath('..')}
             >
               <span className="w-4 shrink-0 text-center">..</span>
               <span className="truncate">Go up</span>
