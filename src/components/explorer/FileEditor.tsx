@@ -1,4 +1,4 @@
-import { LoaderCircle, Pencil, Save, X } from 'lucide-react';
+import { Eye, Code, LoaderCircle, Pencil, Save, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { highlightContent } from '../../lib/syntaxHighlight';
 import { tauriApi } from '../../lib/tauri';
@@ -18,6 +18,7 @@ export function FileEditor() {
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [mdPreview, setMdPreview] = useState(false);
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const highlightRef = useRef<HTMLPreElement | null>(null);
@@ -139,6 +140,7 @@ export function FileEditor() {
   const fileName = getBaseName(editorFile.path);
   const isDirty = draft !== content;
   const canSave = isEditing && !loading && !error && isDirty;
+  const isMarkdown = /\.(md|markdown)$/i.test(editorFile.path);
 
   const handleClose = () => setEditorFile(null);
 
@@ -211,6 +213,25 @@ export function FileEditor() {
             </button>
           )}
 
+          {isMarkdown && !isEditing && (
+            <div className="flex rounded bg-[#1e272e] p-0.5">
+              <button
+                type="button"
+                className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${!mdPreview ? 'bg-[#37474f] text-[#eeffff]' : 'text-[#546e7a] hover:text-[#eeffff]'}`}
+                onClick={() => setMdPreview(false)}
+              >
+                <Code className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${mdPreview ? 'bg-[#37474f] text-[#eeffff]' : 'text-[#546e7a] hover:text-[#eeffff]'}`}
+                onClick={() => setMdPreview(true)}
+              >
+                <Eye className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
           <button
             type="button"
             className="rounded p-1.5 text-[#546e7a] transition-colors hover:bg-[#37474f] hover:text-[#eeffff]"
@@ -254,6 +275,10 @@ export function FileEditor() {
                 />
               </div>
             </div>
+          ) : mdPreview && isMarkdown ? (
+            <div className="h-full min-h-0 overflow-auto px-5 py-4 text-[14px] leading-[1.7] text-[#eeffff] md-preview">
+              <MarkdownPreview content={content} />
+            </div>
           ) : (
             <div className="flex h-full min-h-0 overflow-auto font-mono text-[13px]">
               <pre className="sticky left-0 select-none border-r border-[#1e272e] bg-[#1e272e] px-3 py-3 text-right leading-[1.6] text-[#37474f]">
@@ -284,6 +309,159 @@ function getPathExtension(path: string) {
   const dot = name.lastIndexOf('.');
   if (dot === -1) return '';
   return name.slice(dot).toLowerCase();
+}
+
+function MarkdownPreview({ content }: { content: string }) {
+  const blocks = useMemo(() => parseMarkdownBlocks(content), [content]);
+  return <>{blocks}</>;
+}
+
+function parseMarkdownBlocks(text: string): React.ReactNode[] {
+  const lines = text.split('\n');
+  const nodes: React.ReactNode[] = [];
+  let i = 0;
+  let key = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (/^\s*```/.test(line)) {
+      const lang = line.replace(/^\s*```/, '').trim();
+      const codeLines: string[] = [];
+      i += 1;
+      while (i < lines.length && !/^\s*```/.test(lines[i])) {
+        codeLines.push(lines[i]);
+        i += 1;
+      }
+      i += 1;
+      nodes.push(
+        <pre key={key++} className="my-2 overflow-x-auto rounded bg-[#1e272e] px-4 py-3 text-[13px] leading-[1.6] text-[#c3e88d]">
+          {lang && <div className="mb-1 text-[11px] text-[#546e7a]">{lang}</div>}
+          <code>{codeLines.join('\n')}</code>
+        </pre>
+      );
+      continue;
+    }
+
+    if (/^#{1,6}\s/.test(line)) {
+      const level = line.match(/^(#{1,6})\s/)![1].length;
+      const text = line.replace(/^#{1,6}\s+/, '');
+      const sizes = ['text-2xl', 'text-xl', 'text-lg', 'text-base', 'text-sm', 'text-sm'];
+      const margins = ['mt-6 mb-3', 'mt-5 mb-2', 'mt-4 mb-2', 'mt-3 mb-1', 'mt-2 mb-1', 'mt-2 mb-1'];
+      nodes.push(
+        <div key={key++} className={`font-bold text-[#ffcb6b] ${sizes[level - 1]} ${margins[level - 1]} ${level <= 2 ? 'border-b border-[#37474f] pb-1' : ''}`}>
+          {renderInlineMarkdown(text)}
+        </div>
+      );
+      i += 1;
+      continue;
+    }
+
+    if (/^\s*[-*_]{3,}\s*$/.test(line)) {
+      nodes.push(<hr key={key++} className="my-4 border-[#37474f]" />);
+      i += 1;
+      continue;
+    }
+
+    if (/^>\s?/.test(line)) {
+      const quoteLines: string[] = [];
+      while (i < lines.length && /^>\s?/.test(lines[i])) {
+        quoteLines.push(lines[i].replace(/^>\s?/, ''));
+        i += 1;
+      }
+      nodes.push(
+        <blockquote key={key++} className="my-2 border-l-2 border-[#546e7a] pl-3 italic text-[#546e7a]">
+          {quoteLines.map((ql, qi) => <div key={qi}>{renderInlineMarkdown(ql)}</div>)}
+        </blockquote>
+      );
+      continue;
+    }
+
+    if (/^\s*[-*+]\s/.test(line) || /^\s*\d+\.\s/.test(line)) {
+      const listItems: string[] = [];
+      const ordered = /^\s*\d+\.\s/.test(line);
+      while (i < lines.length && (/^\s*[-*+]\s/.test(lines[i]) || /^\s*\d+\.\s/.test(lines[i]))) {
+        listItems.push(lines[i].replace(/^\s*[-*+]\s|^\s*\d+\.\s/, ''));
+        i += 1;
+      }
+      const Tag = ordered ? 'ol' : 'ul';
+      nodes.push(
+        <Tag key={key++} className={`my-2 pl-6 ${ordered ? 'list-decimal' : 'list-disc'} text-[#eeffff]`}>
+          {listItems.map((li, li_i) => <li key={li_i} className="my-0.5">{renderInlineMarkdown(li)}</li>)}
+        </Tag>
+      );
+      continue;
+    }
+
+    if (line.trim() === '') {
+      nodes.push(<div key={key++} className="h-3" />);
+      i += 1;
+      continue;
+    }
+
+    nodes.push(<p key={key++} className="my-1 text-[#eeffff]">{renderInlineMarkdown(line)}</p>);
+    i += 1;
+  }
+
+  return nodes;
+}
+
+function renderInlineMarkdown(text: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  let remaining = text;
+  let k = 0;
+
+  while (remaining.length > 0) {
+    const codeMatch = remaining.match(/^`([^`]+)`/);
+    if (codeMatch) {
+      parts.push(<code key={k++} className="rounded bg-[#1e272e] px-1.5 py-0.5 text-[12px] text-[#c3e88d]">{codeMatch[1]}</code>);
+      remaining = remaining.slice(codeMatch[0].length);
+      continue;
+    }
+
+    const boldMatch = remaining.match(/^\*\*(.+?)\*\*/);
+    if (boldMatch) {
+      parts.push(<strong key={k++} className="font-bold text-[#eeffff]">{boldMatch[1]}</strong>);
+      remaining = remaining.slice(boldMatch[0].length);
+      continue;
+    }
+
+    const italicMatch = remaining.match(/^[*_](.+?)[*_]/);
+    if (italicMatch) {
+      parts.push(<em key={k++} className="italic text-[#b2ccd6]">{italicMatch[1]}</em>);
+      remaining = remaining.slice(italicMatch[0].length);
+      continue;
+    }
+
+    const linkMatch = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/);
+    if (linkMatch) {
+      parts.push(<a key={k++} className="text-[#82aaff] underline" href={linkMatch[2]} target="_blank" rel="noopener noreferrer">{linkMatch[1]}</a>);
+      remaining = remaining.slice(linkMatch[0].length);
+      continue;
+    }
+
+    const imgMatch = remaining.match(/^!\[([^\]]*)\]\(([^)]+)\)/);
+    if (imgMatch) {
+      parts.push(<span key={k++} className="text-[#546e7a]">[image: {imgMatch[1] || imgMatch[2]}]</span>);
+      remaining = remaining.slice(imgMatch[0].length);
+      continue;
+    }
+
+    const nextSpecial = remaining.search(/[`*_\[!]/);
+    if (nextSpecial === -1) {
+      parts.push(remaining);
+      break;
+    }
+    if (nextSpecial === 0) {
+      parts.push(remaining[0]);
+      remaining = remaining.slice(1);
+    } else {
+      parts.push(remaining.slice(0, nextSpecial));
+      remaining = remaining.slice(nextSpecial);
+    }
+  }
+
+  return parts.length === 1 ? parts[0] : <>{parts}</>;
 }
 
 const BINARY_FILE_EXTENSIONS = new Set([
