@@ -29,7 +29,9 @@ export function FileExplorer() {
     () => tabs.find((tab) => tab.id === activeTabId) ?? null,
     [activeTabId, tabs],
   );
-  const activeCwd = activeTabId ? tabCwds[activeTabId] ?? '' : '';
+  const rawCwd = activeTabId ? tabCwds[activeTabId] ?? '' : '';
+  // Default to '.' for remote or '' for local when cwd hasn't been reported yet
+  const activeCwd = rawCwd || (activeTab?.kind === 'terminal' ? '.' : activeTab?.kind === 'local-terminal' ? '' : '');
   const [directoryMap, setDirectoryMap] = useState<DirectoryMap>({});
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -39,8 +41,8 @@ export function FileExplorer() {
 
   const hasTerminalTab = activeTab?.kind === 'terminal' || activeTab?.kind === 'local-terminal';
   const canBrowseRemote = activeTab?.kind === 'terminal' && Boolean(activeTab.sessionId);
-  const canBrowseLocal = activeTab?.kind === 'local-terminal';
-  const canBrowse = Boolean(activeCwd) && (canBrowseRemote || canBrowseLocal);
+  const canBrowseLocal = activeTab?.kind === 'local-terminal' && Boolean(activeTab.sessionId);
+  const canBrowse = (canBrowseRemote || canBrowseLocal);
 
   const listDirectory = useCallback(async (path: string) => {
     if (!activeTab) {
@@ -105,17 +107,18 @@ export function FileExplorer() {
     setContextMenu(null);
     setError(null);
 
-    if (canBrowse && activeCwd) {
-      void loadDirectory(activeCwd, true);
+    if (canBrowse) {
+      void loadDirectory(activeCwd || '.', true);
     }
   }, [activeCwd, activeTabId, canBrowse, loadDirectory]);
 
   const handleRefresh = useCallback(async () => {
-    if (!canBrowse || !activeCwd) {
+    if (!canBrowse) {
       return;
     }
 
-    const paths = [activeCwd, ...expandedPaths];
+    const root = activeCwd || '.';
+    const paths = [root, ...expandedPaths];
     await Promise.all(paths.map((path) => loadDirectory(path, true)));
   }, [activeCwd, canBrowse, expandedPaths, loadDirectory]);
 
@@ -180,10 +183,11 @@ export function FileExplorer() {
     openFileBrowserTab(activeTab.id, activeTab.connectionId, activeTab.title);
   }, [activeTab, openFileBrowserTab]);
 
-  const rootEntries = activeCwd ? directoryMap[activeCwd] ?? [] : [];
+  const rootKey = activeCwd || '.';
+  const rootEntries = directoryMap[rootKey] ?? [];
   const treeNodes = useMemo(
-    () => buildTreeNodes(rootEntries, activeCwd, expandedPaths, directoryMap),
-    [activeCwd, directoryMap, expandedPaths, rootEntries],
+    () => buildTreeNodes(rootEntries, rootKey, expandedPaths, directoryMap),
+    [rootKey, directoryMap, expandedPaths, rootEntries],
   );
   const parentPath = getParentPath(activeCwd);
 

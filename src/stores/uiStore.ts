@@ -43,9 +43,18 @@ export const useUiStore = create<UiState>((set) => ({
 
   toggleSnippets: () => set((state) => ({ snippetsOpen: !state.snippetsOpen })),
 
-  toggleExplorer: () => set((state) => ({ explorerOpen: !state.explorerOpen })),
+  toggleExplorer: () => set((state) => {
+    const nextOpen = !state.explorerOpen;
+    return {
+      explorerOpen: nextOpen,
+      sidebarCollapsed: nextOpen ? true : state.sidebarCollapsed,
+    };
+  }),
 
-  setExplorerOpen: (open) => set({ explorerOpen: open }),
+  setExplorerOpen: (open) => set((state) => ({
+    explorerOpen: open,
+    sidebarCollapsed: open ? true : state.sidebarCollapsed,
+  })),
 
   setImportDialogOpen: (open) => set({ importDialogOpen: open }),
 
