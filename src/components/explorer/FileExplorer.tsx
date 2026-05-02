@@ -33,6 +33,7 @@ export function FileExplorer() {
   // Default to '.' for remote or '' for local when cwd hasn't been reported yet
   const activeCwd = rawCwd || (activeTab?.kind === 'terminal' ? '.' : activeTab?.kind === 'local-terminal' ? '' : '');
   const [directoryMap, setDirectoryMap] = useState<DirectoryMap>({});
+  const directoryMapRef = useRef<DirectoryMap>({});
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [loadingPath, setLoadingPath] = useState<string | null>(null);
@@ -65,7 +66,7 @@ export function FileExplorer() {
       return;
     }
 
-    if (!force && directoryMap[path]) {
+    if (!force && directoryMapRef.current[path]) {
       return;
     }
 
@@ -74,17 +75,19 @@ export function FileExplorer() {
 
     try {
       const entries = await listDirectory(path);
-      setDirectoryMap((current) => ({
-        ...current,
-        [path]: sortEntries(entries),
-      }));
+      const sorted = sortEntries(entries);
+      setDirectoryMap((current) => {
+        const next = { ...current, [path]: sorted };
+        directoryMapRef.current = next;
+        return next;
+      });
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : 'Failed to load directory';
       setError(message);
     } finally {
       setLoadingPath((current) => (current === path ? null : current));
     }
-  }, [canBrowse, directoryMap, listDirectory]);
+  }, [canBrowse, listDirectory]);
 
   useEffect(() => {
     if (!contextMenu) {
@@ -103,6 +106,7 @@ export function FileExplorer() {
 
   useEffect(() => {
     setDirectoryMap({});
+    directoryMapRef.current = {};
     setExpandedPaths(new Set());
     setContextMenu(null);
     setError(null);
@@ -110,7 +114,8 @@ export function FileExplorer() {
     if (canBrowse) {
       void loadDirectory(activeCwd || '.', true);
     }
-  }, [activeCwd, activeTabId, canBrowse, loadDirectory]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCwd, activeTabId, canBrowse]);
 
   const handleRefresh = useCallback(async () => {
     if (!canBrowse) {
