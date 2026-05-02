@@ -10,6 +10,7 @@ export function Sidebar() {
     toggleSidebar,
     explorerOpen,
     toggleExplorer,
+    snippetsOpen,
     toggleSnippets,
     setSettingsOpen,
   } = useUiStore();
@@ -50,6 +51,19 @@ export function Sidebar() {
           type="button"
         >
           <FolderTree className="h-4 w-4" />
+        </button>
+
+        <button
+          onClick={toggleSnippets}
+          className={`rounded p-1.5 transition-colors ${
+            snippetsOpen
+              ? 'bg-[var(--color-hover)] text-[var(--color-text-primary)]'
+              : 'text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]'
+          }`}
+          title={snippetsOpen ? 'Close Snippets' : 'Open Snippets'}
+          type="button"
+        >
+          <Code className="h-4 w-4" />
         </button>
       </div>
 
@@ -100,34 +114,15 @@ export function Sidebar() {
           )}
         </div>
 
-        <div className="flex items-center justify-between">
-          {!sidebarCollapsed ? (
-            <button
-              onClick={toggleSnippets}
-              className="flex flex-1 items-center gap-2 rounded px-3 py-1.5 text-sm text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-hover)]"
-            >
-              <Code className="h-4 w-4" />
-              <span>Snippets</span>
-            </button>
-          ) : (
-            <div className="flex w-full flex-col items-center gap-2">
-              <button
-                onClick={toggleSnippets}
-                className="flex w-full justify-center rounded p-1.5 text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-hover)]"
-                title="Snippets"
-              >
-                <Code className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setSettingsOpen(true)}
-                className="flex w-full justify-center rounded p-1.5 text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-hover)]"
-                title="Settings"
-              >
-                <Settings className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-        </div>
+        {sidebarCollapsed && (
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="flex w-full justify-center rounded p-1.5 text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-hover)]"
+            title="Settings"
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+        )}
 
         {!sidebarCollapsed && (
           <button

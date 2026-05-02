@@ -50,12 +50,20 @@ export const useUiStore = create<UiState>((set) => ({
   
   toggleCommandPalette: () => set((state) => ({ commandPaletteOpen: !state.commandPaletteOpen })),
 
-  toggleSnippets: () => set((state) => ({ snippetsOpen: !state.snippetsOpen })),
+  toggleSnippets: () => set((state) => {
+    const nextOpen = !state.snippetsOpen;
+    return {
+      snippetsOpen: nextOpen,
+      explorerOpen: nextOpen ? false : state.explorerOpen,
+      sidebarCollapsed: nextOpen ? true : state.sidebarCollapsed,
+    };
+  }),
 
   toggleExplorer: () => set((state) => {
     const nextOpen = !state.explorerOpen;
     return {
       explorerOpen: nextOpen,
+      snippetsOpen: nextOpen ? false : state.snippetsOpen,
       sidebarCollapsed: nextOpen ? true : state.sidebarCollapsed,
     };
   }),
