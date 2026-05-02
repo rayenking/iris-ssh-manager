@@ -60,6 +60,7 @@ pub fn run() {
             commands::local_terminal::local_shell_write,
             commands::local_terminal::local_shell_resize,
             commands::local_terminal::local_shell_disconnect,
+commands::local_terminal::local_shell_cwd,
             commands::tunnel::create_tunnel,
             commands::tunnel::stop_tunnel,
             commands::tunnel::list_tunnels,

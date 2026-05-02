@@ -1,5 +1,6 @@
 import { LoaderCircle, Pencil, Save, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { highlightContent } from '../../lib/syntaxHighlight';
 import { tauriApi } from '../../lib/tauri';
 import { useUiStore } from '../../stores/uiStore';
 
@@ -19,6 +20,8 @@ export function FileEditor() {
   const [saved, setSaved] = useState(false);
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const highlightRef = useRef<HTMLPreElement | null>(null);
+  const gutterRef = useRef<HTMLPreElement | null>(null);
   const saveTimerRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
   const startXRef = useRef(0);
@@ -91,6 +94,19 @@ export function FileEditor() {
   useEffect(() => {
     if (isEditing) textareaRef.current?.focus();
   }, [isEditing]);
+
+  const handleEditScroll = useCallback(() => {
+    if (textareaRef.current) {
+      const { scrollTop, scrollLeft } = textareaRef.current;
+      if (highlightRef.current) {
+        highlightRef.current.scrollTop = scrollTop;
+        highlightRef.current.scrollLeft = scrollLeft;
+      }
+      if (gutterRef.current) {
+        gutterRef.current.scrollTop = scrollTop;
+      }
+    }
+  }, []);
 
   const handleDividerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
@@ -217,16 +233,26 @@ export function FileEditor() {
             </div>
           ) : isEditing ? (
             <div className="flex h-full min-h-0 overflow-hidden font-mono text-[13px]">
-              <pre className="select-none overflow-hidden border-r border-[#1e272e] bg-[#1e272e] px-3 py-3 text-right leading-[1.6] text-[#37474f]">
+              <pre ref={gutterRef} className="select-none overflow-hidden border-r border-[#1e272e] bg-[#1e272e] px-3 py-3 text-right leading-[1.6] text-[#37474f]">
                 {lineNumbers}
               </pre>
-              <textarea
-                ref={textareaRef}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                spellCheck={false}
-                className="h-full flex-1 resize-none bg-[#263238] px-3 py-3 leading-[1.6] text-[#eeffff] outline-none caret-[#ffcb6b]"
-              />
+              <div className="relative flex-1 min-w-0 h-full overflow-hidden">
+                <pre
+                  ref={highlightRef}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-3 py-3 leading-[1.6] text-[#eeffff]"
+                >
+                  {highlightContent(draft || ' ', editorFile.path)}
+                </pre>
+                <textarea
+                  ref={textareaRef}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onScroll={handleEditScroll}
+                  spellCheck={false}
+                  className="relative h-full w-full resize-none overflow-auto bg-transparent px-3 py-3 leading-[1.6] text-transparent outline-none caret-[#ffcb6b] selection:bg-[#546e7a]/40"
+                />
+              </div>
             </div>
           ) : (
             <div className="flex h-full min-h-0 overflow-auto font-mono text-[13px]">
@@ -234,7 +260,7 @@ export function FileEditor() {
                 {lineNumbers}
               </pre>
               <pre className="min-w-0 flex-1 whitespace-pre-wrap break-words px-3 py-3 leading-[1.6] text-[#eeffff]">
-                {content || ' '}
+                {highlightContent(content || ' ', editorFile.path)}
               </pre>
             </div>
           )}

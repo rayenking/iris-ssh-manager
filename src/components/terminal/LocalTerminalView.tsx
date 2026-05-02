@@ -7,6 +7,7 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
 import { useCallback, useEffect, useRef } from 'react';
 import { useLocalShell } from '../../hooks/useLocalShell';
+import { tauriApi } from '../../lib/tauri';
 import { useTerminalCopyPaste } from '../../hooks/useTerminalCopyPaste';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -137,24 +138,22 @@ export function LocalTerminalView({
       }
 
       if (value === '\r' || value === '\n') {
-        const trimmed = inputBuffer.trim();
-        const cdMatch = trimmed.match(/^cd\s+(.+)/);
-        if (cdMatch) {
-          const target = cdMatch[1].replace(/^~/, '$HOME').replace(/["']/g, '');
-          if (target.startsWith('/')) {
-            lastCwdRef.current = target;
-          } else if (target !== '-' && lastCwdRef.current) {
-            lastCwdRef.current = lastCwdRef.current.replace(/\/$/, '') + '/' + target;
-          }
-        } else if (trimmed === 'cd') {
-          lastCwdRef.current = null;
-        }
-
-        if (lastCwdRef.current) {
-          useTerminalStore.getState().setTabCwd(tabId, lastCwdRef.current);
-        }
-
         inputBuffer = '';
+
+        const pollCwd = (delay: number) => {
+          setTimeout(() => {
+            const sid = sessionIdRef.current;
+            if (!sid) return;
+            tauriApi.localShellCwd(sid).then((cwd) => {
+              if (cwd && cwd !== lastCwdRef.current) {
+                lastCwdRef.current = cwd;
+                useTerminalStore.getState().setTabCwd(tabId, cwd);
+              }
+            }).catch(() => {});
+          }, delay);
+        };
+        pollCwd(100);
+        pollCwd(350);
       } else if (value === '\x7f') {
         inputBuffer = inputBuffer.slice(0, -1);
       } else if (value.length === 1 && value >= ' ') {
@@ -313,6 +312,13 @@ export function LocalTerminalView({
       sessionIdRef.current = sessionId;
       emitSessionChange(sessionId);
       emitStatusChange('connected');
+
+      tauriApi.localShellCwd(sessionId).then((cwd) => {
+        if (cwd) {
+          lastCwdRef.current = cwd;
+          useTerminalStore.getState().setTabCwd(tabId, cwd);
+        }
+      }).catch(() => {});
 
       requestAnimationFrame(() => {
         const currentTerminal = terminalRef.current;

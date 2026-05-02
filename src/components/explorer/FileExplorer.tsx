@@ -45,7 +45,7 @@ export function FileExplorer() {
 
   const hasTerminalTab = activeTab?.kind === 'terminal' || activeTab?.kind === 'local-terminal';
   const canBrowseRemote = activeTab?.kind === 'terminal' && Boolean(activeTab.sessionId);
-  const canBrowseLocal = activeTab?.kind === 'local-terminal' && Boolean(activeTab.sessionId);
+  const canBrowseLocal = activeTab?.kind === 'local-terminal';
   const canBrowse = (canBrowseRemote || canBrowseLocal);
 
   const listDirectory = useCallback(async (path: string) => {
@@ -129,13 +129,18 @@ export function FileExplorer() {
         } catch {}
       }
 
-      if ((root === '' || root === '.') && canBrowseLocal) {
+      if ((root === '' || root === '.') && canBrowseLocal && activeTab?.sessionId) {
         try {
-          const homeEntries = await tauriApi.localListDir('');
-          if (homeEntries.length > 0) {
-            root = '';
+          const resolved = await tauriApi.localShellCwd(activeTab.sessionId);
+          if (resolved) {
+            root = resolved;
+            if (activeTabId) setTabCwd(activeTabId, resolved);
           }
-        } catch {}
+        } catch {
+          root = '';
+        }
+      } else if ((root === '' || root === '.') && canBrowseLocal) {
+        root = '';
       }
 
       void loadDirectory(root, true);
@@ -235,7 +240,7 @@ export function FileExplorer() {
     openFileBrowserTab(activeTab.id, activeTab.connectionId, activeTab.title);
   }, [activeTab, openFileBrowserTab]);
 
-  const rootKey = activeCwd || '.';
+  const rootKey = activeCwd || (activeTab?.kind === 'local-terminal' ? '' : '.');
   const rootEntries = useMemo(
     () => filterEntries(directoryMap[rootKey] ?? [], showHidden),
     [directoryMap, rootKey, showHidden],

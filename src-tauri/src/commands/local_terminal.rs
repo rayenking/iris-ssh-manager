@@ -21,6 +21,7 @@ pub struct LocalShellSession {
     master: Arc<Mutex<Box<dyn MasterPty + Send>>>,
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
     child: Arc<Mutex<Box<dyn Child + Send + Sync>>>,
+    child_pid: Option<u32>,
     reader_task: Option<JoinHandle<()>>,
     stream_task: Option<JoinHandle<()>>,
     exit_task: Option<JoinHandle<()>>,
@@ -31,6 +32,7 @@ impl LocalShellSession {
         master: Box<dyn MasterPty + Send>,
         writer: Box<dyn Write + Send>,
         child: Arc<Mutex<Box<dyn Child + Send + Sync>>>,
+        child_pid: Option<u32>,
         reader_task: JoinHandle<()>,
         stream_task: JoinHandle<()>,
         exit_task: JoinHandle<()>,
@@ -39,9 +41,23 @@ impl LocalShellSession {
             master: Arc::new(Mutex::new(master)),
             writer: Arc::new(Mutex::new(writer)),
             child,
+            child_pid,
             reader_task: Some(reader_task),
             stream_task: Some(stream_task),
             exit_task: Some(exit_task),
+        }
+    }
+
+    fn get_cwd(&self) -> Option<String> {
+        #[cfg(unix)]
+        {
+            let pid = self.child_pid?;
+            let link = format!("/proc/{pid}/cwd");
+            std::fs::read_link(&link).ok().map(|p| p.to_string_lossy().into_owned())
+        }
+        #[cfg(not(unix))]
+        {
+            None
         }
     }
 
@@ -218,6 +234,7 @@ pub async fn local_shell_open(
         let _ = on_data.send(Vec::new());
     });
 
+    let child_pid = child.process_id();
     let child = Arc::new(Mutex::new(child));
     let session_id = Uuid::new_v4();
     let sessions = Arc::clone(&pool.sessions);
@@ -227,7 +244,7 @@ pub async fn local_shell_open(
         sessions.blocking_write().remove(&session_id);
     });
 
-    let session = LocalShellSession::new(pair.master, writer, child, reader_task, stream_task, exit_task);
+    let session = LocalShellSession::new(pair.master, writer, child, child_pid, reader_task, stream_task, exit_task);
     pool.add(session_id, session).await;
 
     Ok(session_id.to_string())
@@ -266,6 +283,20 @@ pub async fn local_shell_resize(
         .map_err(|error| error.to_string());
 
     result
+}
+
+#[tauri::command]
+pub async fn local_shell_cwd(
+    pool: State<'_, LocalShellPool>,
+    session_id: String,
+) -> Result<String, String> {
+    let session = get_session(&pool, &session_id).await?;
+    let cwd = session
+        .lock()
+        .await
+        .get_cwd()
+        .unwrap_or_default();
+    Ok(cwd)
 }
 
 #[tauri::command]

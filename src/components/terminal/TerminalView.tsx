@@ -151,22 +151,6 @@ export function TerminalView({
       }
 
       if (value === '\r' || value === '\n') {
-        const trimmed = inputBuffer.trim();
-        const cdMatch = trimmed.match(/^cd\s+(.+)/);
-        if (cdMatch) {
-          const target = cdMatch[1].replace(/^~/, '$HOME').replace(/["']/g, '');
-          if (target.startsWith('/')) {
-            lastCwdRef.current = target;
-          } else if (target === '-') {
-          } else if (lastCwdRef.current) {
-            lastCwdRef.current = lastCwdRef.current.replace(/\/$/, '') + '/' + target;
-          }
-        } else if (trimmed === 'cd') {
-          lastCwdRef.current = null;
-        }
-        if (lastCwdRef.current) {
-          useTerminalStore.getState().setTabCwd(tabId, lastCwdRef.current);
-        }
         inputBuffer = '';
       } else if (value === '\x7f') {
         inputBuffer = inputBuffer.slice(0, -1);
@@ -334,19 +318,22 @@ export function TerminalView({
 
       const encoder = encoderRef.current;
 
-      if (isReconnectRef.current) {
-        setTimeout(() => {
-          const sid = sessionIdRef.current;
-          if (!sid) return;
+      setTimeout(() => {
+        const sid = sessionIdRef.current;
+        if (!sid) return;
 
+        if (isReconnectRef.current) {
           let cmd = ' PROMPT_COMMAND=\'printf "\\e]7;file://%s%s\\a" "${HOSTNAME:-localhost}" "$(pwd)"\'';
           if (lastCwdRef.current) {
             cmd += `; cd ${shellEscape(lastCwdRef.current)} 2>/dev/null`;
           }
           cmd += '; clear\n';
           void write(sid, Array.from(encoder.encode(cmd))).catch(() => {});
-        }, 500);
-      }
+        } else {
+          const cmd = ' PROMPT_COMMAND=\'printf "\\e]7;file://%s%s\\a" "${HOSTNAME:-localhost}" "$(pwd)"\'\n';
+          void write(sid, Array.from(encoder.encode(cmd))).catch(() => {});
+        }
+      }, 500);
 
     } catch (connectError) {
       console.error('Failed to connect SSH terminal:', connectError);

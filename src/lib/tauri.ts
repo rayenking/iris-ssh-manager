@@ -415,6 +415,11 @@ export const tauriApi = {
       ? invoke('local_shell_disconnect', { sessionId })
       : Promise.reject(new Error('Local terminal is only available in the Tauri app.')),
 
+  localShellCwd: (sessionId: string): Promise<string> =>
+    isTauriRuntime()
+      ? invoke<string>('local_shell_cwd', { sessionId })
+      : Promise.resolve(''),
+
   sftpListDir: (sessionId: string, path: string): Promise<FileEntry[]> =>
     isTauriRuntime()
       ? invoke('sftp_list_dir', { sessionId, path })
