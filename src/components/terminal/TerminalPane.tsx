@@ -41,8 +41,39 @@ export function TerminalPane({ pane }: Props) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [dropZone, setDropZone] = useState<PaneSplitDirection | null>(null);
   const [hasSelection, setHasSelection] = useState(false);
+  const [externalDragActive, setExternalDragActive] = useState(false);
+  const dragCounterRef = useRef(0);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const copyPasteRef = useRef<TerminalCopyPasteHandle | null>(null);
+
+  useEffect(() => {
+    const onEnter = (e: globalThis.DragEvent) => {
+      if (e.dataTransfer?.types.includes(TAB_DRAG_TYPE) || e.dataTransfer?.types.includes(CONNECTION_DRAG_TYPE)) {
+        dragCounterRef.current++;
+        setExternalDragActive(true);
+      }
+    };
+    const onLeave = () => {
+      dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+      if (dragCounterRef.current === 0) setExternalDragActive(false);
+    };
+    const onEnd = () => {
+      dragCounterRef.current = 0;
+      setExternalDragActive(false);
+    };
+
+    document.addEventListener('dragenter', onEnter);
+    document.addEventListener('dragleave', onLeave);
+    document.addEventListener('dragend', onEnd);
+    document.addEventListener('drop', onEnd);
+
+    return () => {
+      document.removeEventListener('dragenter', onEnter);
+      document.removeEventListener('dragleave', onLeave);
+      document.removeEventListener('dragend', onEnd);
+      document.removeEventListener('drop', onEnd);
+    };
+  }, []);
 
   const handleCopyPasteReady = useCallback((handle: TerminalCopyPasteHandle) => {
     copyPasteRef.current = handle;
@@ -147,6 +178,14 @@ export function TerminalPane({ pane }: Props) {
         isFocused ? 'border-[var(--color-accent)]' : 'border-transparent'
       }`}
     >
+      {externalDragActive && (
+        <div
+          className="absolute inset-0 z-20"
+          onDragOver={handlePaneDragOver}
+          onDragLeave={handlePaneDragLeave}
+          onDrop={handlePaneDrop}
+        />
+      )}
       {dropZone && (
         <div className="pointer-events-none absolute inset-0 z-30">
           <div className={`absolute bg-[var(--color-accent)] opacity-20 transition-all ${
