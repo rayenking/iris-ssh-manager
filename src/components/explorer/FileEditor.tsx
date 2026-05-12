@@ -1,12 +1,12 @@
 import { Eye, Code, LoaderCircle, Pencil, Save, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { highlightContent } from '../../lib/syntaxHighlight';
 import { tauriApi } from '../../lib/tauri';
 import { useUiStore } from '../../stores/uiStore';
+import { CodeMirrorMiniEditor } from './CodeMirrorMiniEditor';
 
 const MAX_PREVIEW_BYTES = 1024 * 1024;
 const MIN_WIDTH = 280;
-const MAX_WIDTH = 800;
+const MAX_WIDTH = Number.POSITIVE_INFINITY;
 const DEFAULT_WIDTH = 400;
 
 export function FileEditor() {
@@ -20,9 +20,6 @@ export function FileEditor() {
   const [saved, setSaved] = useState(false);
   const [mdPreview, setMdPreview] = useState(false);
   const [width, setWidth] = useState(DEFAULT_WIDTH);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const highlightRef = useRef<HTMLPreElement | null>(null);
-  const gutterRef = useRef<HTMLPreElement | null>(null);
   const saveTimerRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
   const startXRef = useRef(0);
@@ -92,23 +89,6 @@ export function FileEditor() {
     return () => { cancelled = true; };
   }, [editorFile]);
 
-  useEffect(() => {
-    if (isEditing) textareaRef.current?.focus();
-  }, [isEditing]);
-
-  const handleEditScroll = useCallback(() => {
-    if (textareaRef.current) {
-      const { scrollTop, scrollLeft } = textareaRef.current;
-      if (highlightRef.current) {
-        highlightRef.current.scrollTop = scrollTop;
-        highlightRef.current.scrollLeft = scrollLeft;
-      }
-      if (gutterRef.current) {
-        gutterRef.current.scrollTop = scrollTop;
-      }
-    }
-  }, []);
-
   const handleDividerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     draggingRef.current = true;
@@ -128,12 +108,6 @@ export function FileEditor() {
     draggingRef.current = false;
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
   }, []);
-
-  const lineNumbers = useMemo(() => {
-    const text = isEditing ? draft : content;
-    const count = Math.max(text.split('\n').length, 1);
-    return Array.from({ length: count }, (_, i) => i + 1).join('\n');
-  }, [content, draft, isEditing]);
 
   if (!editorFile) return null;
 
@@ -178,22 +152,22 @@ export function FileEditor() {
         onPointerUp={handleDividerUp}
       />
 
-      <div className="flex flex-1 min-w-0 flex-col border-l border-[var(--color-border)] editor-material">
-        <div className="flex items-center gap-2 border-b border-[#1e272e] px-3 py-2 bg-[#263238]">
+      <div className="flex flex-1 min-w-0 flex-col border-l border-[#252526] editor-material bg-[#111111]">
+        <div className="flex items-center gap-2 border-b border-[#252526] bg-[#161616] px-3 py-2">
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium text-[#eeffff]" title={editorFile.path}>
+            <div className="truncate text-sm font-medium text-[#d4d4d4]" title={editorFile.path}>
               {fileName}
             </div>
-            <div className="truncate text-[11px] text-[#546e7a]" title={editorFile.path}>
+            <div className="truncate text-[11px] text-[#6e7681]" title={editorFile.path}>
               {editorFile.path}
             </div>
           </div>
 
-          {saved && <span className="text-[11px] font-medium text-[#c3e88d]">Saved!</span>}
+          {saved && <span className="text-[11px] font-medium text-[#7ee787]">Saved!</span>}
 
           <button
             type="button"
-            className={`rounded p-1.5 transition-colors ${isEditing ? 'bg-[#37474f] text-[#82aaff]' : 'text-[#546e7a] hover:bg-[#37474f] hover:text-[#eeffff]'} disabled:cursor-not-allowed disabled:opacity-40`}
+            className={`rounded p-1.5 transition-colors ${isEditing ? 'bg-[#21262d] text-[#58a6ff]' : 'text-[#6e7681] hover:bg-[#21262d] hover:text-[#d4d4d4]'} disabled:cursor-not-allowed disabled:opacity-40`}
             onClick={handleToggleEdit}
             disabled={loading || Boolean(error)}
             title={isEditing ? 'Cancel editing' : 'Edit file'}
@@ -204,7 +178,7 @@ export function FileEditor() {
           {isEditing && (
             <button
               type="button"
-              className="rounded p-1.5 text-[#546e7a] transition-colors hover:bg-[#37474f] hover:text-[#c3e88d] disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded p-1.5 text-[#6e7681] transition-colors hover:bg-[#21262d] hover:text-[#7ee787] disabled:cursor-not-allowed disabled:opacity-40"
               onClick={() => void handleSave()}
               disabled={!canSave}
               title="Save file"
@@ -214,17 +188,17 @@ export function FileEditor() {
           )}
 
           {isMarkdown && !isEditing && (
-            <div className="flex rounded bg-[#1e272e] p-0.5">
+            <div className="flex rounded bg-[#0d1117] p-0.5">
               <button
                 type="button"
-                className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${!mdPreview ? 'bg-[#37474f] text-[#eeffff]' : 'text-[#546e7a] hover:text-[#eeffff]'}`}
+                className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${!mdPreview ? 'bg-[#21262d] text-[#d4d4d4]' : 'text-[#6e7681] hover:text-[#d4d4d4]'}`}
                 onClick={() => setMdPreview(false)}
               >
                 <Code className="h-3.5 w-3.5" />
               </button>
               <button
                 type="button"
-                className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${mdPreview ? 'bg-[#37474f] text-[#eeffff]' : 'text-[#546e7a] hover:text-[#eeffff]'}`}
+                className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${mdPreview ? 'bg-[#21262d] text-[#d4d4d4]' : 'text-[#6e7681] hover:text-[#d4d4d4]'}`}
                 onClick={() => setMdPreview(true)}
               >
                 <Eye className="h-3.5 w-3.5" />
@@ -234,7 +208,7 @@ export function FileEditor() {
 
           <button
             type="button"
-            className="rounded p-1.5 text-[#546e7a] transition-colors hover:bg-[#37474f] hover:text-[#eeffff]"
+            className="rounded p-1.5 text-[#6e7681] transition-colors hover:bg-[#21262d] hover:text-[#d4d4d4]"
             onClick={handleClose}
             title="Close editor"
           >
@@ -242,7 +216,7 @@ export function FileEditor() {
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-hidden bg-[#263238]">
+        <div className="flex-1 min-h-0 overflow-hidden bg-[#111111]">
           {loading ? (
             <div className="flex h-full items-center justify-center gap-2 text-sm text-[#546e7a]">
               <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -253,41 +227,22 @@ export function FileEditor() {
               {error}
             </div>
           ) : isEditing ? (
-            <div className="flex h-full min-h-0 overflow-hidden font-mono text-[13px]">
-              <pre ref={gutterRef} className="select-none overflow-hidden border-r border-[#1e272e] bg-[#1e272e] px-3 py-3 text-right leading-[1.6] text-[#37474f]">
-                {lineNumbers}
-              </pre>
-              <div className="relative flex-1 min-w-0 h-full overflow-hidden">
-                <pre
-                  ref={highlightRef}
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-3 py-3 leading-[1.6] text-[#eeffff]"
-                >
-                  {highlightContent(draft || ' ', editorFile.path)}
-                </pre>
-                <textarea
-                  ref={textareaRef}
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onScroll={handleEditScroll}
-                  spellCheck={false}
-                  className="relative h-full w-full resize-none overflow-auto bg-transparent px-3 py-3 leading-[1.6] text-transparent outline-none caret-[#ffcb6b] selection:bg-[#546e7a]/40"
-                />
-              </div>
-            </div>
+            <CodeMirrorMiniEditor
+              value={draft}
+              filePath={editorFile.path}
+              readOnly={false}
+              onChange={setDraft}
+            />
           ) : mdPreview && isMarkdown ? (
             <div className="h-full min-h-0 overflow-auto px-5 py-4 text-[14px] leading-[1.7] text-[#eeffff] md-preview">
               <MarkdownPreview content={content} />
             </div>
           ) : (
-            <div className="flex h-full min-h-0 overflow-auto font-mono text-[13px]">
-              <pre className="sticky left-0 select-none border-r border-[#1e272e] bg-[#1e272e] px-3 py-3 text-right leading-[1.6] text-[#37474f]">
-                {lineNumbers}
-              </pre>
-              <pre className="min-w-0 flex-1 whitespace-pre-wrap break-words px-3 py-3 leading-[1.6] text-[#eeffff]">
-                {highlightContent(content || ' ', editorFile.path)}
-              </pre>
-            </div>
+            <CodeMirrorMiniEditor
+              value={content}
+              filePath={editorFile.path}
+              readOnly
+            />
           )}
         </div>
       </div>

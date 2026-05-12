@@ -1,9 +1,11 @@
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
-import { ChevronRight, Eye, EyeOff, File as FileIcon, Folder, FolderTree, RefreshCw } from 'lucide-react';
+import { ChevronRight, Eye, EyeOff, FolderTree, RefreshCw } from 'lucide-react';
+import { FileEntryIcon } from '../file-icons/FileEntryIcon';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { tauriApi } from '../../lib/tauri';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useUiStore } from '../../stores/uiStore';
+import { getPrimaryPaneId, useSplitStore } from '../../stores/splitStore';
 import type { FileEntry } from '../../types/sftp';
 
 interface TreeNode {
@@ -25,15 +27,24 @@ function isTauriRuntime() {
 }
 
 export function FileExplorer() {
-  const { activeTabId, tabs, tabCwds, setTabCwd, openFileBrowserTab } = useTerminalStore();
+  const { activeTabId, tabs, openFileBrowserTab } = useTerminalStore();
   const setEditorFile = useUiStore((state) => state.setEditorFile);
+  const splitTree = useSplitStore((state) => (activeTabId ? state.splitTrees[activeTabId] ?? null : null));
+  const focusedPaneId = useSplitStore((state) => (activeTabId ? state.focusedPaneIdByTabId[activeTabId] ?? null : null));
+  const paneRuntimeById = useSplitStore((state) => state.paneRuntimeById);
+  const setPaneCwd = useSplitStore((state) => state.setPaneCwd);
   const activeTab = useMemo(
     () => tabs.find((tab) => tab.id === activeTabId) ?? null,
     [activeTabId, tabs],
   );
-  const rawCwd = activeTabId ? tabCwds[activeTabId] ?? '' : '';
-  // Default to '.' for remote or '' for local when cwd hasn't been reported yet
-  const activeCwd = rawCwd || (activeTab?.kind === 'terminal' ? '.' : activeTab?.kind === 'local-terminal' ? '' : '');
+  const resolvedPaneId = activeTabId
+    ? focusedPaneId ?? (splitTree ? getPrimaryPaneId(splitTree) : activeTabId)
+    : null;
+  const activePaneRuntime = resolvedPaneId ? paneRuntimeById[resolvedPaneId] ?? null : null;
+  const activePaneConnectionId = activePaneRuntime?.connectionId ?? activeTab?.connectionId ?? null;
+  const activePaneSessionId = activePaneRuntime?.sessionId ?? (activeTab?.kind === 'terminal' || activeTab?.kind === 'local-terminal' ? activeTab.sessionId : undefined);
+  const activePaneKind = activePaneConnectionId === 'local' ? 'local-terminal' : activePaneConnectionId ? 'terminal' : activeTab?.kind ?? null;
+  const activeCwd = activePaneRuntime?.cwd ?? (activePaneKind === 'terminal' ? '.' : activePaneKind === 'local-terminal' ? '' : '');
   const [directoryMap, setDirectoryMap] = useState<DirectoryMap>({});
   const directoryMapRef = useRef<DirectoryMap>({});
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
@@ -43,26 +54,26 @@ export function FileExplorer() {
   const [showHidden, setShowHidden] = useState(false);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
-  const hasTerminalTab = activeTab?.kind === 'terminal' || activeTab?.kind === 'local-terminal';
-  const canBrowseRemote = activeTab?.kind === 'terminal' && Boolean(activeTab.sessionId);
-  const canBrowseLocal = activeTab?.kind === 'local-terminal';
-  const canBrowse = (canBrowseRemote || canBrowseLocal);
+  const hasTerminalTab = activePaneKind === 'terminal' || activePaneKind === 'local-terminal';
+  const canBrowseRemote = activePaneKind === 'terminal' && Boolean(activePaneSessionId);
+  const canBrowseLocal = activePaneKind === 'local-terminal';
+  const canBrowse = canBrowseRemote || canBrowseLocal;
 
   const listDirectory = useCallback(async (path: string) => {
-    if (!activeTab) {
+    if (!activePaneKind) {
       return [] as FileEntry[];
     }
 
-    if (activeTab.kind === 'local-terminal') {
+    if (activePaneKind === 'local-terminal') {
       return tauriApi.localListDir(path);
     }
 
-    if (activeTab.kind === 'terminal' && activeTab.sessionId) {
-      return tauriApi.sftpListDir(activeTab.sessionId, path);
+    if (activePaneKind === 'terminal' && activePaneSessionId) {
+      return tauriApi.sftpListDir(activePaneSessionId, path);
     }
 
     return [] as FileEntry[];
-  }, [activeTab]);
+  }, [activePaneKind, activePaneSessionId]);
 
   const loadDirectory = useCallback(async (path: string, force = false) => {
     if (!canBrowse) {
@@ -119,22 +130,22 @@ export function FileExplorer() {
     const resolveAndLoad = async () => {
       let root = activeCwd || '.';
 
-      if ((root === '.' || root === '') && canBrowseRemote && activeTab?.kind === 'terminal' && activeTab.sessionId) {
+      if ((root === '.' || root === '') && canBrowseRemote && activePaneSessionId) {
         try {
-          const resolved = await tauriApi.sftpRealpath(activeTab.sessionId, '.');
+          const resolved = await tauriApi.sftpRealpath(activePaneSessionId, '.');
           if (resolved && resolved !== '.') {
             root = resolved;
-            if (activeTabId) setTabCwd(activeTabId, resolved);
+            if (resolvedPaneId) setPaneCwd(resolvedPaneId, resolved);
           }
         } catch {}
       }
 
-      if ((root === '' || root === '.') && canBrowseLocal && activeTab?.sessionId) {
+      if ((root === '' || root === '.') && canBrowseLocal && activePaneSessionId) {
         try {
-          const resolved = await tauriApi.localShellCwd(activeTab.sessionId);
+          const resolved = await tauriApi.localShellCwd(activePaneSessionId);
           if (resolved) {
             root = resolved;
-            if (activeTabId) setTabCwd(activeTabId, resolved);
+            if (resolvedPaneId) setPaneCwd(resolvedPaneId, resolved);
           }
         } catch {
           root = '';
@@ -148,7 +159,7 @@ export function FileExplorer() {
 
     void resolveAndLoad();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCwd, activeTabId, canBrowse]);
+  }, [activeCwd, activePaneSessionId, canBrowse, canBrowseLocal, canBrowseRemote, loadDirectory, resolvedPaneId, setPaneCwd]);
 
   const handleRefresh = useCallback(async () => {
     if (!canBrowse) {
@@ -194,21 +205,21 @@ export function FileExplorer() {
       return;
     }
 
-    if (activeTab?.kind === 'local-terminal') {
-      setEditorFile({ path, isLocal: true, sessionId: activeTab.sessionId });
+    if (activePaneKind === 'local-terminal') {
+      setEditorFile({ path, isLocal: true, sessionId: activePaneSessionId });
       return;
     }
 
-    if (activeTab?.kind === 'terminal' && activeTab.sessionId) {
-      setEditorFile({ path, isLocal: false, sessionId: activeTab.sessionId });
+    if (activePaneKind === 'terminal' && activePaneSessionId) {
+      setEditorFile({ path, isLocal: false, sessionId: activePaneSessionId });
       return;
     }
 
     await handleCopyPath(path);
-  }, [activeTab, handleCopyPath, setEditorFile]);
+  }, [activePaneKind, activePaneSessionId, handleCopyPath, setEditorFile]);
 
   const handleCdToPath = useCallback(async (path: string) => {
-    if (!activeTabId || !activeTab) {
+    if (!resolvedPaneId || !activePaneKind || !activePaneSessionId) {
       return;
     }
 
@@ -216,31 +227,31 @@ export function FileExplorer() {
     const data = Array.from(new TextEncoder().encode(command));
 
     try {
-      if (activeTab.kind === 'local-terminal' && activeTab.sessionId) {
-        await tauriApi.localShellWrite(activeTab.sessionId, data);
-        setTabCwd(activeTabId, path);
+      if (activePaneKind === 'local-terminal') {
+        await tauriApi.localShellWrite(activePaneSessionId, data);
+        setPaneCwd(resolvedPaneId, path);
         return;
       }
 
-      if (activeTab.kind === 'terminal' && activeTab.sessionId) {
-        await tauriApi.sshWrite(activeTab.sessionId, data);
-        setTabCwd(activeTabId, path);
+      if (activePaneKind === 'terminal') {
+        await tauriApi.sshWrite(activePaneSessionId, data);
+        setPaneCwd(resolvedPaneId, path);
       }
     } catch (writeError) {
       const message = writeError instanceof Error ? writeError.message : 'Failed to change directory';
       setError(message);
     }
-  }, [activeTab, activeTabId, setTabCwd]);
+  }, [activePaneKind, activePaneSessionId, resolvedPaneId, setPaneCwd]);
 
   const handleOpenSftp = useCallback(() => {
-    if (!activeTab || activeTab.kind !== 'terminal') {
+    if (!activeTab || activePaneKind !== 'terminal') {
       return;
     }
 
-    openFileBrowserTab(activeTab.id, activeTab.connectionId, activeTab.title);
-  }, [activeTab, openFileBrowserTab]);
+    openFileBrowserTab(activeTab.id, activePaneConnectionId ?? activeTab.connectionId, activeTab.title);
+  }, [activePaneConnectionId, activePaneKind, activeTab, openFileBrowserTab]);
 
-  const rootKey = activeCwd || (activeTab?.kind === 'local-terminal' ? '' : '.');
+  const rootKey = activeCwd || (activePaneKind === 'local-terminal' ? '' : '.');
   const rootEntries = useMemo(
     () => filterEntries(directoryMap[rootKey] ?? [], showHidden),
     [directoryMap, rootKey, showHidden],
@@ -336,14 +347,22 @@ export function FileExplorer() {
                   <button
                     type="button"
                     className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left"
-                    onClick={() => void (node.entry.isDir ? handleCdToPath(node.path) : handleOpenFile(node.path))}
+                    onClick={() => {
+                      if (node.entry.isDir) {
+                        void handleToggleExpand(node.path);
+                        return;
+                      }
+
+                      void handleOpenFile(node.path);
+                    }}
+                    onDoubleClick={() => {
+                      if (node.entry.isDir) {
+                        void handleCdToPath(node.path);
+                      }
+                    }}
                     title={node.path}
                   >
-                    {node.entry.isDir ? (
-                      <Folder className="h-4 w-4 shrink-0 text-[var(--color-warning)]" />
-                    ) : (
-                      <FileIcon className="h-4 w-4 shrink-0 text-[var(--color-text-muted)]" />
-                    )}
+                    <FileEntryIcon name={node.entry.name} isDir={node.entry.isDir} fullPath={node.path} className="h-4 w-4" />
                     <span className="truncate text-xs text-[var(--color-text-primary)]">{node.entry.name}</span>
                   </button>
 

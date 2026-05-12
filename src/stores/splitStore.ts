@@ -1,20 +1,34 @@
 import { create } from 'zustand';
 import type { SplitBranch, SplitDirection, SplitLeaf, SplitNode } from '../types/split';
+import type { TabStatus } from '../types/terminal';
 
 type PaneSplitDirection = 'right' | 'left' | 'down' | 'up';
 
+type PaneRuntime = {
+  connectionId: string;
+  sessionId?: string;
+  cwd?: string;
+  status?: TabStatus;
+};
+
 interface SplitState {
   splitTrees: Record<string, SplitNode>;
-  focusedPaneId: string | null;
+  focusedPaneIdByTabId: Record<string, string | null>;
+  paneRuntimeById: Record<string, PaneRuntime>;
   initSplit: (tabId: string, connectionId: string) => void;
   removeSplit: (tabId: string) => void;
   splitPane: (tabId: string, paneId: string, direction: PaneSplitDirection) => void;
   splitPaneWithConnection: (tabId: string, paneId: string, direction: PaneSplitDirection, connectionId: string) => void;
+  mergePaneIntoTab: (sourceTabId: string, sourcePaneId: string, targetTabId: string, targetPaneId: string, direction: PaneSplitDirection) => string | null;
   closePane: (tabId: string, paneId: string) => void;
   updateRatio: (tabId: string, path: number[], ratio: number) => void;
-  setFocusedPane: (paneId: string | null) => void;
+  setFocusedPane: (tabId: string, paneId: string | null) => void;
+  setPaneSessionId: (paneId: string, sessionId?: string) => void;
+  setPaneCwd: (paneId: string, cwd: string) => void;
+  setPaneStatus: (paneId: string, status: TabStatus) => void;
   getSplitTree: (tabId: string) => SplitNode | null;
   getAllPaneIds: (tabId: string) => string[];
+  getFocusedPaneId: (tabId: string) => string | null;
 }
 
 function createLeaf(tabId: string, connectionId: string, id?: string): SplitLeaf {
@@ -174,13 +188,83 @@ function updateNodeRatio(node: SplitNode, path: number[], ratio: number): SplitN
   };
 }
 
+function replaceTabId(node: SplitNode, tabId: string): SplitNode {
+  if (node.type === 'leaf') {
+    return {
+      ...node,
+      tabId,
+    };
+  }
+
+  return {
+    ...node,
+    first: replaceTabId(node.first, tabId),
+    second: replaceTabId(node.second, tabId),
+  };
+}
+
+function extractLeaf(node: SplitNode, paneId: string): { leaf: SplitLeaf | null; tree: SplitNode | null } {
+  if (node.type === 'leaf') {
+    return node.id === paneId ? { leaf: node, tree: null } : { leaf: null, tree: node };
+  }
+
+  const left = extractLeaf(node.first, paneId);
+  if (left.leaf) {
+    if (!left.tree) {
+      return { leaf: left.leaf, tree: node.second };
+    }
+
+    return {
+      leaf: left.leaf,
+      tree: {
+        ...node,
+        first: left.tree,
+      },
+    };
+  }
+
+  const right = extractLeaf(node.second, paneId);
+  if (right.leaf) {
+    if (!right.tree) {
+      return { leaf: right.leaf, tree: node.first };
+    }
+
+    return {
+      leaf: right.leaf,
+      tree: {
+        ...node,
+        second: right.tree,
+      },
+    };
+  }
+
+  return { leaf: null, tree: node };
+}
+
+function insertExistingLeaf(node: SplitNode, paneId: string, direction: PaneSplitDirection, incomingLeaf: SplitLeaf): SplitNode {
+  if (node.type === 'leaf') {
+    if (node.id !== paneId) {
+      return node;
+    }
+
+    return createBranch(direction, node, incomingLeaf);
+  }
+
+  return {
+    ...node,
+    first: insertExistingLeaf(node.first, paneId, direction, incomingLeaf),
+    second: insertExistingLeaf(node.second, paneId, direction, incomingLeaf),
+  };
+}
+
 function clampRatio(ratio: number) {
   return Math.min(0.85, Math.max(0.15, ratio));
 }
 
 export const useSplitStore = create<SplitState>((set, get) => ({
   splitTrees: {},
-  focusedPaneId: null,
+  focusedPaneIdByTabId: {},
+  paneRuntimeById: {},
 
   initSplit: (tabId, connectionId) => {
     set((state) => {
@@ -195,7 +279,16 @@ export const useSplitStore = create<SplitState>((set, get) => ({
           ...state.splitTrees,
           [tabId]: root,
         },
-        focusedPaneId: state.focusedPaneId ?? root.id,
+        focusedPaneIdByTabId: {
+          ...state.focusedPaneIdByTabId,
+          [tabId]: root.id,
+        },
+        paneRuntimeById: {
+          ...state.paneRuntimeById,
+          [root.id]: {
+            connectionId,
+          },
+        },
       };
     });
   },
@@ -208,13 +301,22 @@ export const useSplitStore = create<SplitState>((set, get) => ({
         return state;
       }
 
-      const paneIds = new Set(collectPaneIds(tree));
+      const paneIds = collectPaneIds(tree);
       const nextTrees = { ...state.splitTrees };
       delete nextTrees[tabId];
 
+      const nextFocusedPaneIdByTabId = { ...state.focusedPaneIdByTabId };
+      delete nextFocusedPaneIdByTabId[tabId];
+
+      const nextPaneRuntimeById = { ...state.paneRuntimeById };
+      paneIds.forEach((paneId) => {
+        delete nextPaneRuntimeById[paneId];
+      });
+
       return {
         splitTrees: nextTrees,
-        focusedPaneId: state.focusedPaneId && paneIds.has(state.focusedPaneId) ? null : state.focusedPaneId,
+        focusedPaneIdByTabId: nextFocusedPaneIdByTabId,
+        paneRuntimeById: nextPaneRuntimeById,
       };
     });
   },
@@ -231,13 +333,23 @@ export const useSplitStore = create<SplitState>((set, get) => ({
       const nextPaneIds = collectPaneIds(nextTree);
       const previousPaneIds = new Set(collectPaneIds(tree));
       const newPaneId = nextPaneIds.find((id) => !previousPaneIds.has(id)) ?? paneId;
+      const sourceRuntime = state.paneRuntimeById[paneId] ?? { connectionId: 'local' };
 
       return {
         splitTrees: {
           ...state.splitTrees,
           [tabId]: nextTree,
         },
-        focusedPaneId: newPaneId,
+        focusedPaneIdByTabId: {
+          ...state.focusedPaneIdByTabId,
+          [tabId]: newPaneId,
+        },
+        paneRuntimeById: {
+          ...state.paneRuntimeById,
+          [newPaneId]: {
+            connectionId: sourceRuntime.connectionId,
+          },
+        },
       };
     });
   },
@@ -260,9 +372,81 @@ export const useSplitStore = create<SplitState>((set, get) => ({
           ...state.splitTrees,
           [tabId]: nextTree,
         },
-        focusedPaneId: newPaneId,
+        focusedPaneIdByTabId: {
+          ...state.focusedPaneIdByTabId,
+          [tabId]: newPaneId,
+        },
+        paneRuntimeById: {
+          ...state.paneRuntimeById,
+          [newPaneId]: {
+            connectionId,
+          },
+        },
       };
     });
+  },
+
+  mergePaneIntoTab: (sourceTabId, sourcePaneId, targetTabId, targetPaneId, direction) => {
+    let mergedPaneId: string | null = null;
+
+    set((state) => {
+      const sourceTree = state.splitTrees[sourceTabId];
+      const targetTree = state.splitTrees[targetTabId];
+
+      if (!sourceTree || !targetTree || sourceTabId === targetTabId) {
+        return state;
+      }
+
+      const extracted = extractLeaf(sourceTree, sourcePaneId);
+      if (!extracted.leaf) {
+        return state;
+      }
+
+      const movedLeaf = replaceTabId(extracted.leaf, targetTabId) as SplitLeaf;
+      const nextTargetTree = insertExistingLeaf(targetTree, targetPaneId, direction, movedLeaf);
+      mergedPaneId = movedLeaf.id;
+
+      const nextSplitTrees = {
+        ...state.splitTrees,
+        [targetTabId]: nextTargetTree,
+      };
+
+      const nextFocusedPaneIdByTabId = {
+        ...state.focusedPaneIdByTabId,
+        [targetTabId]: movedLeaf.id,
+      };
+
+      const nextPaneRuntimeById = { ...state.paneRuntimeById };
+      nextPaneRuntimeById[movedLeaf.id] = {
+        ...(state.paneRuntimeById[movedLeaf.id] ?? { connectionId: movedLeaf.connectionId }),
+        connectionId: movedLeaf.connectionId,
+      };
+
+      if (extracted.tree) {
+        nextSplitTrees[sourceTabId] = extracted.tree;
+        const remainingSourcePaneIds = collectPaneIds(extracted.tree);
+        nextFocusedPaneIdByTabId[sourceTabId] = remainingSourcePaneIds[0] ?? null;
+
+        const sourcePaneIds = collectPaneIds(sourceTree);
+        const sourceRemovedPaneIds = sourcePaneIds.filter((paneId) => !remainingSourcePaneIds.includes(paneId));
+        sourceRemovedPaneIds.forEach((paneId) => {
+          if (paneId !== movedLeaf.id) {
+            delete nextPaneRuntimeById[paneId];
+          }
+        });
+      } else {
+        delete nextSplitTrees[sourceTabId];
+        delete nextFocusedPaneIdByTabId[sourceTabId];
+      }
+
+      return {
+        splitTrees: nextSplitTrees,
+        focusedPaneIdByTabId: nextFocusedPaneIdByTabId,
+        paneRuntimeById: nextPaneRuntimeById,
+      };
+    });
+
+    return mergedPaneId;
   },
 
   closePane: (tabId, paneId) => {
@@ -280,16 +464,19 @@ export const useSplitStore = create<SplitState>((set, get) => ({
       }
 
       const nextPaneIds = collectPaneIds(nextTree);
+      const nextPaneRuntimeById = { ...state.paneRuntimeById };
+      delete nextPaneRuntimeById[paneId];
 
       return {
         splitTrees: {
           ...state.splitTrees,
           [tabId]: nextTree,
         },
-        focusedPaneId:
-          state.focusedPaneId === paneId
-            ? nextPaneIds[0] ?? null
-            : state.focusedPaneId,
+        focusedPaneIdByTabId: {
+          ...state.focusedPaneIdByTabId,
+          [tabId]: state.focusedPaneIdByTabId[tabId] === paneId ? nextPaneIds[0] ?? null : state.focusedPaneIdByTabId[tabId],
+        },
+        paneRuntimeById: nextPaneRuntimeById,
       };
     });
   },
@@ -311,7 +498,50 @@ export const useSplitStore = create<SplitState>((set, get) => ({
     });
   },
 
-  setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),
+  setFocusedPane: (tabId, paneId) => {
+    set((state) => ({
+      focusedPaneIdByTabId: {
+        ...state.focusedPaneIdByTabId,
+        [tabId]: paneId,
+      },
+    }));
+  },
+
+  setPaneSessionId: (paneId, sessionId) => {
+    set((state) => ({
+      paneRuntimeById: {
+        ...state.paneRuntimeById,
+        [paneId]: {
+          ...(state.paneRuntimeById[paneId] ?? { connectionId: 'local' }),
+          sessionId,
+        },
+      },
+    }));
+  },
+
+  setPaneCwd: (paneId, cwd) => {
+    set((state) => ({
+      paneRuntimeById: {
+        ...state.paneRuntimeById,
+        [paneId]: {
+          ...(state.paneRuntimeById[paneId] ?? { connectionId: 'local' }),
+          cwd,
+        },
+      },
+    }));
+  },
+
+  setPaneStatus: (paneId, status) => {
+    set((state) => ({
+      paneRuntimeById: {
+        ...state.paneRuntimeById,
+        [paneId]: {
+          ...(state.paneRuntimeById[paneId] ?? { connectionId: 'local' }),
+          status,
+        },
+      },
+    }));
+  },
 
   getSplitTree: (tabId) => get().splitTrees[tabId] ?? null,
 
@@ -319,6 +549,8 @@ export const useSplitStore = create<SplitState>((set, get) => ({
     const tree = get().splitTrees[tabId];
     return tree ? collectPaneIds(tree) : [];
   },
+
+  getFocusedPaneId: (tabId) => get().focusedPaneIdByTabId[tabId] ?? null,
 }));
 
-export type { PaneSplitDirection, SplitDirection };
+export type { PaneRuntime, PaneSplitDirection, SplitDirection };

@@ -1,5 +1,5 @@
 export type TabStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
-export type TabKind = 'terminal' | 'local-terminal' | 'files';
+export type TabKind = 'terminal' | 'local-terminal' | 'files' | 'review-diff';
 
 interface BaseTab {
   id: string;
@@ -25,4 +25,12 @@ export interface FileBrowserTab extends BaseTab {
   terminalTabId: string;
 }
 
-export type AppTab = TerminalTab | FileBrowserTab | LocalTerminalTab;
+export interface ReviewDiffTab extends BaseTab {
+  kind: 'review-diff';
+  terminalTabId: string;
+  filePath: string;
+  repoRoot: string;
+  preview: boolean;
+}
+
+export type AppTab = TerminalTab | FileBrowserTab | LocalTerminalTab | ReviewDiffTab;

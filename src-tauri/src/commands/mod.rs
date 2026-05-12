@@ -1,6 +1,7 @@
 pub mod backup;
 pub mod config;
 pub mod connection;
+pub mod git;
 pub mod keychain;
 pub mod local_terminal;
 pub mod tunnel;

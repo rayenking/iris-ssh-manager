@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::path::PathBuf;
 use tauri::ipc::Channel;
 
-const REPO: &str = "rayenking/iris-ssh-manager";
+const REPO: &str = "rayenking/irisx";
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Serialize)]

@@ -11,6 +11,12 @@
     "tauri": "node scripts/tauri-cli.mjs"
   },
   "dependencies": {
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/legacy-modes": "^6.5.2",
+    "@codemirror/merge": "^6.12.1",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.42.1",
     "@tailwindcss/vite": "^4.2.4",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.2",

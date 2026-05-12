@@ -1,8 +1,8 @@
 <p align="center">
-  <img src=".github/assets/logo.png" alt="Iris SSH Manager" width="80" />
+  <img src=".github/assets/logo.png" alt="IrisX" width="80" />
 </p>
 
-<h1 align="center">Iris SSH Manager</h1>
+<h1 align="center">IrisX</h1>
 
 <p align="center">
   A modern, cross-platform SSH client and connection manager built with <b>Tauri 2.0</b> + <b>Rust</b> + <b>React</b> + <b>TypeScript</b> + <b>Tailwind CSS v4</b>.
@@ -13,13 +13,13 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/license/rayenking/iris-ssh-manager" alt="License" />
-  <img src="https://img.shields.io/github/v/release/rayenking/iris-ssh-manager" alt="Release" />
+  <img src="https://img.shields.io/github/license/rayenking/irisx" alt="License" />
+  <img src="https://img.shields.io/github/v/release/rayenking/irisx" alt="Release" />
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue" alt="Platform" />
 </p>
 
 <p align="center">
-  <img src=".github/assets/cover.png" alt="Iris SSH Manager Preview" width="720" />
+  <img src=".github/assets/cover.png" alt="IrisX Preview" width="720" />
 </p>
 
 ## Features
@@ -29,6 +29,8 @@
 - **Local Terminal** — Spawn local shell sessions without SSH
 - **Connection Manager** — CRUD with groups, search, drag reorder, SSH config import
 - **SFTP File Browser** — Dual-pane with drag-and-drop, remote-to-remote transfers, context menu
+- **Mini File Editor** — Side-panel editor/viewer with syntax highlighting for quick file edits beside the terminal
+- **Code Review Panel** — Git changes list + syntax-colored diff preview without leaving the active terminal
 - **Port Forwarding** — Local, remote, and dynamic (SOCKS5) tunnel management
 - **Snippets** — Command snippets with variable substitution, scoped per connection or global
 - **Command Palette** — Ctrl+K quick access to connections, snippets, and actions
@@ -43,12 +45,12 @@
 ### One-line install (Linux / macOS)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rayenking/iris-ssh-manager/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/rayenking/irisx/master/install.sh | bash
 ```
 
 ### Download
 
-Pre-built binaries for all platforms available on the [Releases page](https://github.com/rayenking/iris-ssh-manager/releases):
+Pre-built binaries for all platforms available on the [Releases page](https://github.com/rayenking/irisx/releases):
 
 | Platform | Format |
 |----------|--------|
@@ -59,8 +61,8 @@ Pre-built binaries for all platforms available on the [Releases page](https://gi
 ### Build from source
 
 ```bash
-git clone https://github.com/rayenking/iris-ssh-manager.git
-cd iris-ssh-manager
+git clone https://github.com/rayenking/irisx.git
+cd irisx
 npm install
 npm run tauri build
 ```

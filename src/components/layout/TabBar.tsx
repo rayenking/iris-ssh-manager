@@ -1,27 +1,48 @@
-import { FolderOpen, Plus } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import type { DragEvent } from 'react';
 import { useTerminalStore } from '../../stores/terminalStore';
+import { getPrimaryPaneId, useSplitStore } from '../../stores/splitStore';
 import { TerminalTab } from '../terminal/TerminalTab';
+
+interface Props {
+  className?: string;
+}
+
+function cn(...parts: Array<string | false | null | undefined>) {
+  return parts.filter(Boolean).join(' ');
+}
 
 export const TAB_DRAG_TYPE = 'application/x-iris-tab';
 
-export function TabBar() {
-  const { tabs, activeTabId, setActiveTab, closeTab, openFileBrowserTab, reorderTabs } = useTerminalStore();
-  const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
+type TabDragPayload = {
+  tabId: string;
+  paneId?: string;
+};
+
+function parseTabDragPayload(raw: string): TabDragPayload | null {
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as TabDragPayload;
+    if (!parsed?.tabId) return null;
+    return parsed;
+  } catch {
+    return { tabId: raw };
+  }
+}
+
+export function TabBar({ className }: Props) {
+  const { tabs, activeTabId, setActiveTab, closeTab, reorderTabs } = useTerminalStore();
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
   const [dropSide, setDropSide] = useState<'left' | 'right' | null>(null);
 
-  const handleOpenFiles = () => {
-    if (!activeTab || activeTab.kind !== 'terminal' || !activeTab.sessionId) {
-      return;
-    }
-
-    openFileBrowserTab(activeTab.id, activeTab.connectionId, activeTab.title);
-  };
-
   const handleTabDragStart = useCallback((e: DragEvent<HTMLDivElement>, tabId: string) => {
-    e.dataTransfer.setData(TAB_DRAG_TYPE, tabId);
+    const splitTree = useSplitStore.getState().getSplitTree(tabId);
+    const payload: TabDragPayload = {
+      tabId,
+      paneId: splitTree ? getPrimaryPaneId(splitTree) : tabId,
+    };
+    e.dataTransfer.setData(TAB_DRAG_TYPE, JSON.stringify(payload));
     e.dataTransfer.effectAllowed = 'move';
   }, []);
 
@@ -37,7 +58,8 @@ export function TabBar() {
 
   const handleTabDrop = useCallback((e: DragEvent<HTMLDivElement>, targetTabId: string) => {
     e.preventDefault();
-    const sourceTabId = e.dataTransfer.getData(TAB_DRAG_TYPE);
+    const payload = parseTabDragPayload(e.dataTransfer.getData(TAB_DRAG_TYPE));
+    const sourceTabId = payload?.tabId;
     setDragOverTabId(null);
     setDropSide(null);
     if (!sourceTabId || sourceTabId === targetTabId) return;
@@ -60,8 +82,8 @@ export function TabBar() {
   }, []);
 
   return (
-    <div className="flex items-center h-10 bg-[var(--color-bg-primary)] border-b border-[var(--color-border)] overflow-x-auto shrink-0" onDragLeave={handleBarDragLeave}>
-      <div className="flex flex-1 items-center h-full">
+    <div className={cn('flex min-w-0 flex-1 items-center overflow-x-auto', className)} onDragLeave={handleBarDragLeave}>
+      <div className="flex min-w-max items-center gap-1 px-2">
         {tabs.map((tab) => (
           <TerminalTab
             key={tab.id}
@@ -76,23 +98,6 @@ export function TabBar() {
           />
         ))}
       </div>
-
-      <button
-        className="h-full px-3 flex items-center gap-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] transition-colors border-l border-[var(--color-border)] disabled:cursor-not-allowed disabled:opacity-50"
-        disabled={!activeTab || activeTab.kind !== 'terminal' || !activeTab.sessionId}
-        onClick={handleOpenFiles}
-        title="Open SFTP file browser"
-        type="button"
-      >
-        <FolderOpen className="w-4 h-4" />
-      </button>
-
-      <button 
-        className="h-full px-3 flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] transition-colors border-l border-[var(--color-border)]"
-        type="button"
-      >
-        <Plus className="w-4 h-4" />
-      </button>
     </div>
   );
 }

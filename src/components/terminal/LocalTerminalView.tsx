@@ -6,12 +6,13 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
 import { useCallback, useEffect, useRef } from 'react';
+import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { useLocalShell } from '../../hooks/useLocalShell';
 import { tauriApi } from '../../lib/tauri';
 import { useTerminalCopyPaste } from '../../hooks/useTerminalCopyPaste';
 import { useTerminalStore } from '../../stores/terminalStore';
+import { useSplitStore } from '../../stores/splitStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import type { TerminalCopyPasteHandle } from './TerminalView';
 import type { TabStatus } from '../../types/terminal';
 
@@ -50,12 +51,17 @@ export function LocalTerminalView({
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const mountedSessionIdRef = useRef<string | null>(null);
+  const openingRef = useRef(false);
   const encoderRef = useRef(new TextEncoder());
   const lastCwdRef = useRef<string | null>(null);
   const statusChangeRef = useRef<(status: TabStatus) => void>(() => {});
   const sessionChangeRef = useRef<(sessionId?: string) => void>(() => {});
-  const { open, close, write, resize, connectionState, error } = useLocalShell();
+
+  const { open, attach, close, write, resize, connectionState, error } = useLocalShell();
   const { updateTabStatus, setTabSessionId, activeTabId: currentActiveTabId } = useTerminalStore();
+  const paneRuntime = useSplitStore((state) => state.paneRuntimeById[paneId] ?? null);
+  const { setPaneSessionId, setPaneCwd, setPaneStatus } = useSplitStore();
   const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer, theme } = useSettingsStore();
 
   const { copySelection, pasteClipboard, hasSelection, attach: attachCopyPaste } = useTerminalCopyPaste({
@@ -70,13 +76,11 @@ export function LocalTerminalView({
   }, [copySelection, pasteClipboard, hasSelection, onCopyPasteReady]);
 
   useEffect(() => {
-    statusChangeRef.current = onStatusChange
-      ?? (reportTabState ? (status) => updateTabStatus(tabId, status) : () => {});
+    statusChangeRef.current = onStatusChange ?? (reportTabState ? (status) => updateTabStatus(tabId, status) : () => {});
   }, [onStatusChange, reportTabState, tabId, updateTabStatus]);
 
   useEffect(() => {
-    sessionChangeRef.current = onSessionChange
-      ?? (reportTabState ? (sessionId) => setTabSessionId(tabId, sessionId) : () => {});
+    sessionChangeRef.current = onSessionChange ?? (reportTabState ? (sessionId) => setTabSessionId(tabId, sessionId) : () => {});
   }, [onSessionChange, reportTabState, setTabSessionId, tabId]);
 
   const emitStatusChange = useCallback((status: TabStatus) => {
@@ -87,9 +91,28 @@ export function LocalTerminalView({
     sessionChangeRef.current(sessionId);
   }, []);
 
+  const handleStreamData = useCallback((data: number[]) => {
+    if (data.length === 0) {
+      sessionIdRef.current = null;
+      setPaneSessionId(paneId, undefined);
+      emitSessionChange(undefined);
+      setPaneStatus(paneId, 'disconnected');
+      return;
+    }
+
+    const bytes = new Uint8Array(data);
+    terminalRef.current?.write(bytes);
+
+    const text = new TextDecoder().decode(bytes);
+    const osc7Match = text.match(/\x1b\]7;file:\/\/[^/]*(\/[^\x07\x1b]*)/);
+    if (osc7Match?.[1]) {
+      lastCwdRef.current = decodeURIComponent(osc7Match[1]);
+      setPaneCwd(paneId, lastCwdRef.current);
+    }
+  }, [emitSessionChange, paneId, setPaneCwd, setPaneSessionId, setPaneStatus]);
+
   useEffect(() => {
     const terminalHost = terminalHostRef.current;
-
     if (!terminalHost) {
       return;
     }
@@ -119,27 +142,19 @@ export function LocalTerminalView({
 
     try {
       terminal.loadAddon(new WebglAddon());
-      console.info('xterm renderer: WebGL');
-    } catch (webglError) {
-      console.warn('xterm renderer fallback: DOM', webglError);
-    }
+    } catch {}
 
     requestAnimationFrame(() => {
       fitAddon.fit();
     });
 
-    let inputBuffer = '';
-
     const handleTerminalData = terminal.onData((value) => {
       const sessionId = sessionIdRef.current;
-
       if (!sessionId) {
         return;
       }
 
       if (value === '\r' || value === '\n') {
-        inputBuffer = '';
-
         const pollCwd = (delay: number) => {
           setTimeout(() => {
             const sid = sessionIdRef.current;
@@ -147,17 +162,13 @@ export function LocalTerminalView({
             tauriApi.localShellCwd(sid).then((cwd) => {
               if (cwd && cwd !== lastCwdRef.current) {
                 lastCwdRef.current = cwd;
-                useTerminalStore.getState().setTabCwd(tabId, cwd);
+                setPaneCwd(paneId, cwd);
               }
             }).catch(() => {});
           }, delay);
         };
         pollCwd(100);
         pollCwd(350);
-      } else if (value === '\x7f') {
-        inputBuffer = inputBuffer.slice(0, -1);
-      } else if (value.length === 1 && value >= ' ') {
-        inputBuffer += value;
       }
 
       const data = Array.from(encoderRef.current.encode(value));
@@ -172,46 +183,32 @@ export function LocalTerminalView({
     let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
     const syncLocalSize = () => {
-      if (disposed) {
-        return;
-      }
-
-      if (resizeTimer) {
-        clearTimeout(resizeTimer);
-      }
+      if (disposed) return;
+      if (resizeTimer) clearTimeout(resizeTimer);
 
       resizeTimer = setTimeout(() => {
         resizeTimer = null;
-
-        if (disposed) {
-          return;
-        }
+        if (disposed) return;
 
         const currentTerminal = terminalRef.current;
         const currentSessionId = sessionIdRef.current;
         const currentFitAddon = fitAddonRef.current;
-
         if (!currentTerminal || !currentSessionId || !currentFitAddon) {
           return;
         }
 
         currentFitAddon.fit();
-
         if (currentTerminal.cols === lastCols && currentTerminal.rows === lastRows) {
           return;
         }
 
         lastCols = currentTerminal.cols;
         lastRows = currentTerminal.rows;
-
         void resize(currentSessionId, currentTerminal.cols, currentTerminal.rows).catch(() => {});
       }, 50);
     };
 
-    const resizeObserver = new ResizeObserver(() => {
-      syncLocalSize();
-    });
-
+    const resizeObserver = new ResizeObserver(syncLocalSize);
     if (containerRef.current) {
       resizeObserver.observe(containerRef.current);
     }
@@ -220,9 +217,7 @@ export function LocalTerminalView({
 
     return () => {
       disposed = true;
-      if (resizeTimer) {
-        clearTimeout(resizeTimer);
-      }
+      if (resizeTimer) clearTimeout(resizeTimer);
       window.removeEventListener('resize', syncLocalSize);
       resizeObserver.disconnect();
       handleTerminalData.dispose();
@@ -230,12 +225,11 @@ export function LocalTerminalView({
       terminalRef.current = null;
       fitAddonRef.current = null;
     };
-  }, [attachCopyPaste, resize, tabId, write]);
+  }, [attachCopyPaste, cursorBlink, cursorStyle, resize, scrollbackBuffer, setPaneCwd, terminalFont, terminalFontSize, write]);
 
   useEffect(() => {
     const terminal = terminalRef.current;
     const fitAddon = fitAddonRef.current;
-
     if (!terminal || !fitAddon) {
       return;
     }
@@ -246,7 +240,6 @@ export function LocalTerminalView({
     terminal.options.fontSize = terminalFontSize;
     terminal.options.scrollback = scrollbackBuffer;
 
-    // Delay theme read so CSS variables are applied after theme switch
     requestAnimationFrame(() => {
       if (terminalRef.current) {
         terminalRef.current.options.theme = getTerminalTheme();
@@ -265,11 +258,7 @@ export function LocalTerminalView({
       requestAnimationFrame(() => {
         const terminal = terminalRef.current;
         const fitAddon = fitAddonRef.current;
-
-        if (!terminal || !fitAddon) {
-          return;
-        }
-
+        if (!terminal || !fitAddon) return;
         fitAddon.fit();
         terminal.refresh(0, terminal.rows - 1);
         terminal.focus();
@@ -291,39 +280,42 @@ export function LocalTerminalView({
 
   const doOpen = useCallback(async () => {
     const terminal = terminalRef.current;
-    if (!terminal) {
+    if (!terminal || openingRef.current) {
       return;
     }
 
+    openingRef.current = true;
     emitStatusChange('connecting');
+    setPaneStatus(paneId, 'connecting');
 
     try {
-      const sessionId = await open(terminal.cols || 80, terminal.rows || 24, (data) => {
-        if (data.length === 0) {
-          sessionIdRef.current = null;
-          emitSessionChange(undefined);
-          return;
-        }
+      const cols = terminal.cols || 80;
+      const rows = terminal.rows || 24;
+      const existingSessionId = paneRuntime?.sessionId;
 
-        const bytes = new Uint8Array(data);
-        terminalRef.current?.write(bytes);
-
-        const text = new TextDecoder().decode(bytes);
-        const osc7Match = text.match(/\x1b\]7;file:\/\/[^/]*(\/[^\x07\x1b]*)/);
-        if (osc7Match?.[1]) {
-          lastCwdRef.current = decodeURIComponent(osc7Match[1]);
-          useTerminalStore.getState().setTabCwd(tabId, lastCwdRef.current);
+      let sessionId: string;
+      if (existingSessionId) {
+        try {
+          sessionId = await attach(existingSessionId, cols, rows, handleStreamData);
+        } catch {
+          setPaneSessionId(paneId, undefined);
+          sessionId = await open(cols, rows, handleStreamData);
         }
-      });
+      } else {
+        sessionId = await open(cols, rows, handleStreamData);
+      }
 
       sessionIdRef.current = sessionId;
+      mountedSessionIdRef.current = sessionId;
+      setPaneSessionId(paneId, sessionId);
       emitSessionChange(sessionId);
       emitStatusChange('connected');
+      setPaneStatus(paneId, 'connected');
 
       tauriApi.localShellCwd(sessionId).then((cwd) => {
         if (cwd) {
           lastCwdRef.current = cwd;
-          useTerminalStore.getState().setTabCwd(tabId, cwd);
+          setPaneCwd(paneId, cwd);
         }
       }).catch(() => {});
 
@@ -331,7 +323,6 @@ export function LocalTerminalView({
         const currentTerminal = terminalRef.current;
         const fitAddon = fitAddonRef.current;
         const currentSessionId = sessionIdRef.current;
-
         if (!currentTerminal || !fitAddon || !currentSessionId) {
           return;
         }
@@ -341,41 +332,46 @@ export function LocalTerminalView({
       });
     } catch (openError) {
       console.error('Failed to start local terminal:', openError);
+    } finally {
+      openingRef.current = false;
     }
-  }, [emitSessionChange, emitStatusChange, open, resize, tabId]);
+  }, [attach, emitSessionChange, emitStatusChange, handleStreamData, open, paneId, resize, setPaneCwd, setPaneSessionId, setPaneStatus]);
 
   useEffect(() => {
     void doOpen();
 
     return () => {
-      const sessionId = sessionIdRef.current;
+      const sessionId = mountedSessionIdRef.current;
+      mountedSessionIdRef.current = null;
       sessionIdRef.current = null;
-      emitSessionChange(undefined);
-      emitStatusChange('disconnected');
-      if (sessionId) {
+      const paneStillExists = Boolean(useSplitStore.getState().paneRuntimeById[paneId]);
+      if (!paneStillExists && sessionId) {
+        setPaneSessionId(paneId, undefined);
+        emitSessionChange(undefined);
+        emitStatusChange('disconnected');
+        setPaneStatus(paneId, 'disconnected');
         void close(sessionId).catch(() => {});
       }
     };
-  }, [close, doOpen, emitSessionChange, emitStatusChange]);
+  }, [close, doOpen, emitSessionChange, emitStatusChange, paneId, setPaneSessionId, setPaneStatus]);
 
   useEffect(() => {
+    setPaneStatus(paneId, connectionState);
+
     if (connectionState === 'error') {
       emitStatusChange('error');
       return;
     }
-
     if (connectionState === 'connected') {
       emitStatusChange('connected');
       return;
     }
-
     if (connectionState === 'connecting') {
       emitStatusChange('connecting');
       return;
     }
-
     emitStatusChange('disconnected');
-  }, [connectionState, emitStatusChange]);
+  }, [connectionState, emitStatusChange, paneId, setPaneStatus]);
 
   useEffect(() => {
     if (!reportTabState) {

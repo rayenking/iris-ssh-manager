@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="rayenking/iris-ssh-manager"
+REPO="rayenking/irisx"
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
@@ -37,7 +37,7 @@ install_linux_deb() {
     sudo tar xf data.tar.* -C /
   fi
 
-  info "Iris SSH Manager $TAG installed!"
+  info "IrisX $TAG installed!"
 }
 
 install_arch() {
@@ -66,7 +66,7 @@ install_arch() {
   ar x "$DEB_NAME"
   sudo tar xf data.tar.* -C /
 
-  info "Iris SSH Manager $TAG installed!"
+  info "IrisX $TAG installed!"
 }
 
 install_macos() {
@@ -106,7 +106,7 @@ install_macos() {
       info "Installing to /Applications..."
       cp -R "$APP" /Applications/
       hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true
-      info "Iris SSH Manager $TAG installed to /Applications!"
+      info "IrisX $TAG installed to /Applications!"
     else
       info "Contents of $MOUNT_POINT:"
       ls -la "$MOUNT_POINT" 2>/dev/null || true
@@ -145,7 +145,7 @@ install_macos() {
       fi
     fi
 
-    info "Iris SSH Manager installed from source!"
+    info "IrisX installed from source!"
   fi
 }
 

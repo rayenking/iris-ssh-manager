@@ -24,6 +24,7 @@ dist-ssr
 *.sw?
 
 # Internal planning/dev files
+.claude/
 .sisyphus/
 .issue/
 dev.log

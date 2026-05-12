@@ -6,13 +6,14 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { RotateCw, Network } from 'lucide-react';
+import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { useSSH } from '../../hooks/useSSH';
 import { useTerminalCopyPaste } from '../../hooks/useTerminalCopyPaste';
 import { useTerminalStore } from '../../stores/terminalStore';
+import { useSplitStore } from '../../stores/splitStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { TunnelManager } from '../tunnels/TunnelManager';
-import { RotateCw, Network } from 'lucide-react';
-import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import type { TabStatus } from '../../types/terminal';
 
 export interface TerminalCopyPasteHandle {
@@ -62,12 +63,16 @@ export function TerminalView({
   const reconnectAttemptRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastCwdRef = useRef<string | null>(null);
-  const isReconnectRef = useRef(false);
+  const mountedSessionIdRef = useRef<string | null>(null);
+  const connectingRef = useRef(false);
   const statusChangeRef = useRef<(status: TabStatus) => void>(() => {});
   const sessionChangeRef = useRef<(sessionId?: string) => void>(() => {});
   const [tunnelPanelOpen, setTunnelPanelOpen] = useState(false);
-  const { connect, disconnect, write, resize, connectionState, error } = useSSH();
-  const { updateTabStatus, setTabSessionId } = useTerminalStore();
+
+  const { connect, attach, disconnect, write, resize, connectionState, error } = useSSH();
+  const { updateTabStatus, setTabSessionId, activeTabId: currentActiveTabId } = useTerminalStore();
+  const paneRuntime = useSplitStore((state) => state.paneRuntimeById[paneId] ?? null);
+  const { setPaneSessionId, setPaneCwd, setPaneStatus } = useSplitStore();
   const { terminalFont, terminalFontSize, cursorStyle, cursorBlink, scrollbackBuffer, autoReconnect, theme } = useSettingsStore();
 
   const { copySelection, pasteClipboard, hasSelection, attach: attachCopyPaste } = useTerminalCopyPaste({
@@ -82,13 +87,11 @@ export function TerminalView({
   }, [copySelection, pasteClipboard, hasSelection, onCopyPasteReady]);
 
   useEffect(() => {
-    statusChangeRef.current = onStatusChange
-      ?? (reportTabState ? (status) => updateTabStatus(tabId, status) : () => {});
+    statusChangeRef.current = onStatusChange ?? (reportTabState ? (status) => updateTabStatus(tabId, status) : () => {});
   }, [onStatusChange, reportTabState, tabId, updateTabStatus]);
 
   useEffect(() => {
-    sessionChangeRef.current = onSessionChange
-      ?? (reportTabState ? (sessionId) => setTabSessionId(tabId, sessionId) : () => {});
+    sessionChangeRef.current = onSessionChange ?? (reportTabState ? (sessionId) => setTabSessionId(tabId, sessionId) : () => {});
   }, [onSessionChange, reportTabState, setTabSessionId, tabId]);
 
   const emitStatusChange = useCallback((status: TabStatus) => {
@@ -99,9 +102,20 @@ export function TerminalView({
     sessionChangeRef.current(sessionId);
   }, []);
 
+  const handleStreamData = useCallback((data: number[]) => {
+    const bytes = new Uint8Array(data);
+    terminalRef.current?.write(bytes);
+
+    const text = new TextDecoder().decode(bytes);
+    const osc7Match = text.match(/\x1b\]7;file:\/\/[^/]*(\/[^\x07\x1b]*)/);
+    if (osc7Match?.[1]) {
+      lastCwdRef.current = decodeURIComponent(osc7Match[1]);
+      setPaneCwd(paneId, lastCwdRef.current);
+    }
+  }, [paneId, setPaneCwd]);
+
   useEffect(() => {
     const terminalHost = terminalHostRef.current;
-
     if (!terminalHost) {
       return;
     }
@@ -131,31 +145,16 @@ export function TerminalView({
 
     try {
       terminal.loadAddon(new WebglAddon());
-      console.info('xterm renderer: WebGL');
-    } catch (webglError) {
-      console.warn('xterm renderer fallback: DOM', webglError);
-    }
+    } catch {}
 
-    // Delay initial fit to ensure the container has been laid out by the browser
     requestAnimationFrame(() => {
       fitAddon.fit();
     });
 
-    let inputBuffer = '';
-
     const handleTerminalData = terminal.onData((value) => {
       const sessionId = sessionIdRef.current;
-
       if (!sessionId) {
         return;
-      }
-
-      if (value === '\r' || value === '\n') {
-        inputBuffer = '';
-      } else if (value === '\x7f') {
-        inputBuffer = inputBuffer.slice(0, -1);
-      } else if (value.length === 1 && value >= ' ') {
-        inputBuffer += value;
       }
 
       const data = Array.from(encoderRef.current.encode(value));
@@ -171,7 +170,6 @@ export function TerminalView({
 
     const syncRemoteSize = () => {
       if (disposed) return;
-
       if (resizeTimer) clearTimeout(resizeTimer);
 
       resizeTimer = setTimeout(() => {
@@ -181,47 +179,22 @@ export function TerminalView({
         const currentTerminal = terminalRef.current;
         const currentSessionId = sessionIdRef.current;
         const currentFitAddon = fitAddonRef.current;
-
         if (!currentTerminal || !currentSessionId || !currentFitAddon) {
           return;
         }
 
         currentFitAddon.fit();
-
         if (currentTerminal.cols === lastCols && currentTerminal.rows === lastRows) {
           return;
         }
 
         lastCols = currentTerminal.cols;
         lastRows = currentTerminal.rows;
-
         void resize(currentSessionId, currentTerminal.cols, currentTerminal.rows).catch(() => {});
       }, 50);
     };
 
-    const applyTerminalSettings = () => {
-      const currentTerminal = terminalRef.current;
-
-      if (!currentTerminal) {
-        return;
-      }
-
-      currentTerminal.options.cursorBlink = cursorBlink;
-      currentTerminal.options.cursorStyle = cursorStyle;
-      currentTerminal.options.fontFamily = terminalFont;
-      currentTerminal.options.fontSize = terminalFontSize;
-      currentTerminal.options.scrollback = scrollbackBuffer;
-      currentTerminal.options.theme = getTerminalTheme();
-      currentTerminal.refresh(0, currentTerminal.rows - 1);
-      fitAddon.fit();
-    };
-
-    applyTerminalSettings();
-
-    const resizeObserver = new ResizeObserver(() => {
-      syncRemoteSize();
-    });
-
+    const resizeObserver = new ResizeObserver(syncRemoteSize);
     if (containerRef.current) {
       resizeObserver.observe(containerRef.current);
     }
@@ -238,12 +211,11 @@ export function TerminalView({
       terminalRef.current = null;
       fitAddonRef.current = null;
     };
-  }, [attachCopyPaste, resize, tabId, write]);
+  }, [attachCopyPaste, cursorBlink, cursorStyle, resize, scrollbackBuffer, terminalFont, terminalFontSize, write]);
 
   useEffect(() => {
     const terminal = terminalRef.current;
     const fitAddon = fitAddonRef.current;
-
     if (!terminal || !fitAddon) {
       return;
     }
@@ -254,7 +226,6 @@ export function TerminalView({
     terminal.options.fontSize = terminalFontSize;
     terminal.options.scrollback = scrollbackBuffer;
 
-    // Delay theme read so CSS variables are applied after theme switch
     requestAnimationFrame(() => {
       if (terminalRef.current) {
         terminalRef.current.options.theme = getTerminalTheme();
@@ -265,10 +236,6 @@ export function TerminalView({
     fitAddon.fit();
   }, [cursorBlink, cursorStyle, scrollbackBuffer, terminalFont, terminalFontSize, theme]);
 
-  // Re-render xterm canvas when this tab becomes active again.
-  // WebGL context is lost when the container is hidden (display:none),
-  // so we need to fit + refresh when the tab is shown again.
-  const { activeTabId: currentActiveTabId } = useTerminalStore();
   const isActive = currentActiveTabId === tabId;
   const wasActiveRef = useRef(isActive);
 
@@ -298,54 +265,42 @@ export function TerminalView({
 
   const doConnect = useCallback(async () => {
     const terminal = terminalRef.current;
-    if (!terminal) return;
+    if (!terminal || connectingRef.current) return;
 
+    connectingRef.current = true;
     emitStatusChange('connecting');
+    setPaneStatus(paneId, 'connecting');
 
     try {
       const initialCols = terminal.cols || 80;
       const initialRows = terminal.rows || 24;
+      const existingSessionId = paneRuntime?.sessionId;
 
-      const sessionId = await connect(connectionId, (data) => {
-        const bytes = new Uint8Array(data);
-        terminalRef.current?.write(bytes);
-
-        const text = new TextDecoder().decode(bytes);
-        const osc7Match = text.match(/\x1b\]7;file:\/\/[^/]*(\/[^\x07\x1b]*)/);
-        if (osc7Match?.[1]) {
-          lastCwdRef.current = decodeURIComponent(osc7Match[1]);
-          useTerminalStore.getState().setTabCwd(tabId, lastCwdRef.current);
+      let sessionId: string;
+      if (existingSessionId) {
+        try {
+          sessionId = await attach(existingSessionId, handleStreamData, initialCols, initialRows);
+        } catch {
+          setPaneSessionId(paneId, undefined);
+          sessionId = await connect(connectionId, handleStreamData, initialCols, initialRows);
         }
-      }, initialCols, initialRows);
+      } else {
+        sessionId = await connect(connectionId, handleStreamData, initialCols, initialRows);
+      }
 
       sessionIdRef.current = sessionId;
+      mountedSessionIdRef.current = sessionId;
+      setPaneSessionId(paneId, sessionId);
       emitSessionChange(sessionId);
       emitStatusChange('connected');
+      setPaneStatus(paneId, 'connected');
       reconnectAttemptRef.current = 0;
-
-      const encoder = encoderRef.current;
-
-      setTimeout(() => {
-        const sid = sessionIdRef.current;
-        if (!sid) return;
-
-        if (isReconnectRef.current) {
-          let cmd = ' PROMPT_COMMAND=\'printf "\\e]7;file://%s%s\\a" "${HOSTNAME:-localhost}" "$(pwd)"\'';
-          if (lastCwdRef.current) {
-            cmd += `; cd ${shellEscape(lastCwdRef.current)} 2>/dev/null`;
-          }
-          cmd += '; clear\n';
-          void write(sid, Array.from(encoder.encode(cmd))).catch(() => {});
-        } else {
-          const cmd = ' PROMPT_COMMAND=\'printf "\\e]7;file://%s%s\\a" "${HOSTNAME:-localhost}" "$(pwd)"\'\n';
-          void write(sid, Array.from(encoder.encode(cmd))).catch(() => {});
-        }
-      }, 500);
-
     } catch (connectError) {
       console.error('Failed to connect SSH terminal:', connectError);
+    } finally {
+      connectingRef.current = false;
     }
-  }, [connect, connectionId, emitSessionChange, emitStatusChange, resize, write]);
+  }, [attach, connect, connectionId, emitSessionChange, emitStatusChange, handleStreamData, paneId, setPaneSessionId, setPaneStatus]);
 
   const handleReconnect = useCallback(() => {
     const oldSessionId = sessionIdRef.current;
@@ -354,7 +309,6 @@ export function TerminalView({
     if (oldSessionId) {
       void disconnect(oldSessionId).catch(() => {});
     }
-    isReconnectRef.current = true;
     terminalRef.current?.write('\r\n\x1b[33mReconnecting...\x1b[0m\r\n');
     void doConnect();
   }, [disconnect, doConnect, emitSessionChange]);
@@ -367,15 +321,21 @@ export function TerminalView({
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
-      const sessionId = sessionIdRef.current;
+
+      const sessionId = mountedSessionIdRef.current;
+      mountedSessionIdRef.current = null;
       sessionIdRef.current = null;
-      emitSessionChange(undefined);
-      emitStatusChange('disconnected');
-      if (sessionId) {
+
+      const paneStillExists = Boolean(useSplitStore.getState().paneRuntimeById[paneId]);
+      if (!paneStillExists && sessionId) {
+        setPaneSessionId(paneId, undefined);
+        emitSessionChange(undefined);
+        emitStatusChange('disconnected');
+        setPaneStatus(paneId, 'disconnected');
         void disconnect(sessionId).catch(() => {});
       }
     };
-  }, [disconnect, doConnect, emitSessionChange, emitStatusChange]);
+  }, [disconnect, doConnect, emitSessionChange, emitStatusChange, paneId, setPaneSessionId, setPaneStatus]);
 
   useEffect(() => {
     if (connectionState !== 'disconnected' || !autoReconnect) return;
@@ -401,23 +361,22 @@ export function TerminalView({
   }, [connectionState, autoReconnect, handleReconnect]);
 
   useEffect(() => {
+    setPaneStatus(paneId, connectionState);
+
     if (connectionState === 'error') {
       emitStatusChange('error');
       return;
     }
-
     if (connectionState === 'connected') {
       emitStatusChange('connected');
       return;
     }
-
     if (connectionState === 'connecting') {
       emitStatusChange('connecting');
       return;
     }
-
     emitStatusChange('disconnected');
-  }, [connectionState, emitStatusChange]);
+  }, [connectionState, emitStatusChange, paneId, setPaneStatus]);
 
   useEffect(() => {
     if (!reportTabState) {
@@ -430,17 +389,17 @@ export function TerminalView({
 
   return (
     <div ref={containerRef} data-pane-id={paneId} className="relative flex h-full w-full min-h-0 flex-1 bg-[var(--color-terminal-bg)]">
-      <div className="relative flex-1 min-w-0 flex flex-col h-full">
+      <div className="relative flex h-full min-w-0 flex-1 flex-col">
         <div ref={terminalHostRef} className="flex-1 min-h-0 overflow-hidden px-2 py-2" />
 
         {connectionState === 'connected' && (
           <button
             type="button"
-            onClick={() => setTunnelPanelOpen(prev => !prev)}
-            className={`absolute top-2 right-2 z-10 rounded p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] transition-colors ${tunnelPanelOpen ? 'bg-[var(--color-hover)] text-[var(--color-text-primary)]' : ''}`}
+            onClick={() => setTunnelPanelOpen((prev) => !prev)}
+            className={`absolute right-2 top-2 z-10 rounded p-1.5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] ${tunnelPanelOpen ? 'bg-[var(--color-hover)] text-[var(--color-text-primary)]' : ''}`}
             title="Toggle tunnels panel"
           >
-            <Network className="w-4 h-4" />
+            <Network className="h-4 w-4" />
           </button>
         )}
 
@@ -459,14 +418,12 @@ export function TerminalView({
               <button
                 type="button"
                 onClick={handleReconnect}
-                className="inline-flex items-center gap-2 rounded bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"
+                className="inline-flex items-center gap-2 rounded bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
               >
-                <RotateCw className="w-4 h-4" />
+                <RotateCw className="h-4 w-4" />
                 Reconnect
               </button>
-              {autoReconnect && (
-                <span className="text-xs text-[var(--color-text-muted)]">Auto-reconnect is enabled</span>
-              )}
+              {autoReconnect && <span className="text-xs text-[var(--color-text-muted)]">Auto-reconnect is enabled</span>}
             </div>
           </div>
         )}
@@ -477,9 +434,9 @@ export function TerminalView({
             <button
               type="button"
               onClick={handleReconnect}
-              className="ml-4 inline-flex items-center gap-1.5 rounded bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 transition-opacity"
+              className="ml-4 inline-flex items-center gap-1.5 rounded bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
             >
-              <RotateCw className="w-3.5 h-3.5" />
+              <RotateCw className="h-3.5 w-3.5" />
               Retry
             </button>
           </div>
@@ -489,8 +446,4 @@ export function TerminalView({
       {tunnelPanelOpen && <TunnelManager sessionId={sessionIdRef.current} />}
     </div>
   );
-}
-
-function shellEscape(s: string): string {
-  return "'" + s.replace(/'/g, "'\\''") + "'";
 }

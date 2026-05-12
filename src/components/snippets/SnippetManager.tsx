@@ -99,33 +99,36 @@ export function SnippetManager() {
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-[var(--color-bg-secondary)] border-l border-[var(--color-border)]">
-      <div className="flex items-center justify-between p-4 border-b border-[var(--color-border)]">
-        <h2 className="text-lg font-medium text-[var(--color-text-primary)]">Snippets</h2>
-        <button
-          onClick={() => setEditingSnippet(null)}
-          disabled={!isTauriRuntime}
-          className="p-1 rounded hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-          title="New Snippet"
-        >
-          <Plus className="w-5 h-5" />
-        </button>
-      </div>
+    <div className="flex h-full w-full flex-col bg-[var(--color-bg-secondary)]">
+      <div className="border-b border-[var(--color-border)] px-4 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-medium text-[var(--color-text-primary)]">Snippets</h2>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">Reusable terminal commands with scoped visibility.</p>
+          </div>
+          <button
+            onClick={() => setEditingSnippet(null)}
+            disabled={!isTauriRuntime}
+            className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-primary)] p-2 text-[var(--color-text-secondary)] shadow-[var(--shadow-sm)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
+            title="New Snippet"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
 
-      <div className="p-4 border-b border-[var(--color-border)]">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-muted)]" />
+        <div className="relative mt-4">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" />
           <input
             type="text"
             placeholder="Search snippets..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] pl-9 pr-4 py-2 rounded border border-[var(--color-border)] focus:outline-none focus:border-[var(--color-accent)] text-sm"
+            className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-primary)] py-2.5 pl-10 pr-4 text-sm text-[var(--color-text-primary)] shadow-[var(--shadow-sm)]"
           />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+      <div className="flex-1 space-y-1 overflow-y-auto p-3">
         {categories.length === 0 ? (
           <div className="text-center text-[var(--color-text-muted)] mt-10">
             <p>No snippets yet.</p>
@@ -159,7 +162,7 @@ export function SnippetManager() {
                       return (
                         <div
                           key={snippet.id}
-                          className="group rounded-md hover:bg-[var(--color-bg-primary)] transition-colors"
+                          className="group rounded-[var(--radius-md)] border border-transparent hover:border-[var(--color-border)] hover:bg-[var(--color-bg-primary)] transition-colors"
                         >
                           <div
                             className={`flex items-center gap-2 px-2 py-1.5 ${canInsert ? 'cursor-pointer' : 'cursor-default'}`}

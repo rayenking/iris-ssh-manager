@@ -11,6 +11,7 @@ import type {
 import type { Snippet, CreateSnippetInput, UpdateSnippetInput } from '../types/snippet';
 import type { Tunnel, TunnelConfig } from '../types/tunnel';
 import type { FileEntry, TransferProgress } from '../types/sftp';
+import type { GitDiffResponse, GitStatusResponse } from '../types/git';
 
 const SETTINGS_STORAGE_PREFIX = 'iris-ssh-manager.settings.';
 const memorySettingsFallback = new Map<string, string>();
@@ -380,6 +381,11 @@ export const tauriApi = {
       ? invoke('ssh_connect', { connectionId, onData, cols, rows })
       : Promise.reject(new Error('SSH connections are only available in the Tauri app.')),
 
+  sshAttach: (sessionId: string, onData: Channel<number[]>, cols?: number, rows?: number): Promise<void> =>
+    isTauriRuntime()
+      ? invoke('ssh_attach', { sessionId, onData, cols, rows })
+      : Promise.resolve(),
+
   sshDisconnect: (sessionId: string): Promise<void> =>
     isTauriRuntime()
       ? invoke('ssh_disconnect', { sessionId })
@@ -398,6 +404,11 @@ export const tauriApi = {
   localShellOpen: (channel: Channel<number[]>, cols: number, rows: number): Promise<string> =>
     isTauriRuntime()
       ? invoke('local_shell_open', { onData: channel, cols, rows })
+      : Promise.reject(new Error('Local terminal is only available in the Tauri app.')),
+
+  localShellAttach: (channel: Channel<number[]>, sessionId: string, cols: number, rows: number): Promise<void> =>
+    isTauriRuntime()
+      ? invoke('local_shell_attach', { onData: channel, sessionId, cols, rows })
       : Promise.reject(new Error('Local terminal is only available in the Tauri app.')),
 
   localShellWrite: (sessionId: string, data: number[]): Promise<void> =>
@@ -484,6 +495,21 @@ export const tauriApi = {
     isTauriRuntime()
       ? invoke('local_write_file', { path, content })
       : Promise.reject(new Error('Local file writing is only available in the Tauri app.')),
+
+  getGitRepoRoot: (cwd: string): Promise<string | null> =>
+    isTauriRuntime()
+      ? invoke('get_git_repo_root', { cwd })
+      : Promise.resolve(null),
+
+  getGitStatus: (cwd: string): Promise<GitStatusResponse> =>
+    isTauriRuntime()
+      ? invoke('get_git_status', { cwd })
+      : Promise.reject(new Error('Git status is only available in the Tauri app.')),
+
+  getGitDiff: (cwd: string, filePath: string): Promise<GitDiffResponse> =>
+    isTauriRuntime()
+      ? invoke('get_git_diff', { cwd, filePath })
+      : Promise.reject(new Error('Git diff is only available in the Tauri app.')),
 
   localDelete: (path: string): Promise<void> =>
     isTauriRuntime() ? invoke('local_delete', { path }) : Promise.resolve(),

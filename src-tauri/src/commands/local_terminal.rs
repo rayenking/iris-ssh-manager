@@ -17,6 +17,67 @@ const MAX_WRITE_BYTES: usize = 64 * 1024;
 
 type SharedLocalShellSession = Arc<Mutex<LocalShellSession>>;
 
+fn spawn_reader_task(
+    mut reader: Box<dyn Read + Send>,
+    output_tx: mpsc::Sender<Vec<u8>>,
+) -> JoinHandle<()> {
+    tokio::task::spawn_blocking(move || {
+        let mut buffer = [0_u8; 4096];
+
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(read_count) => {
+                    if output_tx.blocking_send(buffer[..read_count].to_vec()).is_err() {
+                        break;
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+    })
+}
+
+fn spawn_stream_task(
+    mut output_rx: mpsc::Receiver<Vec<u8>>,
+    on_data: Channel<Vec<u8>>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut buffer = Vec::with_capacity(READ_BATCH_LIMIT);
+        let flush_interval = Duration::from_millis(8);
+
+        loop {
+            if buffer.is_empty() {
+                match output_rx.recv().await {
+                    Some(chunk) => buffer.extend_from_slice(&chunk),
+                    None => break,
+                }
+            } else {
+                match tokio::time::timeout(flush_interval, output_rx.recv()).await {
+                    Ok(Some(chunk)) => buffer.extend_from_slice(&chunk),
+                    Ok(None) => break,
+                    Err(_) => {
+                        if on_data.send(std::mem::take(&mut buffer)).is_err() {
+                            break;
+                        }
+                        continue;
+                    }
+                }
+            }
+
+            if buffer.len() >= READ_BATCH_LIMIT && on_data.send(std::mem::take(&mut buffer)).is_err() {
+                break;
+            }
+        }
+
+        if !buffer.is_empty() {
+            let _ = on_data.send(buffer);
+        }
+
+        let _ = on_data.send(Vec::new());
+    })
+}
+
 pub struct LocalShellSession {
     master: Arc<Mutex<Box<dyn MasterPty + Send>>>,
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
@@ -99,7 +160,7 @@ impl LocalShellSession {
         Ok(())
     }
 
-    async fn disconnect(&mut self) -> Result<()> {
+    fn detach_reading(&mut self) {
         if let Some(task) = self.reader_task.take() {
             task.abort();
         }
@@ -107,6 +168,25 @@ impl LocalShellSession {
         if let Some(task) = self.stream_task.take() {
             task.abort();
         }
+    }
+
+    fn attach_reading(&mut self, on_data: Channel<Vec<u8>>) -> Result<()> {
+        self.detach_reading();
+
+        let reader = self
+            .master
+            .blocking_lock()
+            .try_clone_reader()
+            .context("failed to clone PTY reader for local shell attach")?;
+        let (output_tx, output_rx) = mpsc::channel::<Vec<u8>>(READ_CHANNEL_CAPACITY);
+
+        self.reader_task = Some(spawn_reader_task(reader, output_tx));
+        self.stream_task = Some(spawn_stream_task(output_rx, on_data));
+        Ok(())
+    }
+
+    async fn disconnect(&mut self) -> Result<()> {
+        self.detach_reading();
 
         if let Some(task) = self.exit_task.take() {
             task.abort();
@@ -118,6 +198,7 @@ impl LocalShellSession {
 
         Ok(())
     }
+
 }
 
 impl Drop for LocalShellSession {
@@ -268,6 +349,28 @@ pub async fn local_shell_open(
     pool.add(session_id, session).await;
 
     Ok(session_id.to_string())
+}
+
+#[tauri::command]
+pub async fn local_shell_attach(
+    pool: State<'_, LocalShellPool>,
+    session_id: String,
+    on_data: Channel<Vec<u8>>,
+    cols: u32,
+    rows: u32,
+) -> Result<(), String> {
+    let session = get_session(&pool, &session_id).await?;
+    let session = session.lock().await;
+    session.resize(cols, rows).await.map_err(|error| error.to_string())?;
+    drop(session);
+
+    let current_session = get_session(&pool, &session_id).await?;
+    let mut current_session = current_session.lock().await;
+    current_session.detach_reading();
+    current_session
+        .attach_reading(on_data)
+        .map_err(|error| error.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]

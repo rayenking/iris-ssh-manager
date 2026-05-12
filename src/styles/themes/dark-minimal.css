@@ -22,4 +22,12 @@
   --color-terminal-fg: #efefef;
   --color-terminal-cursor: #7c9cff;
   --color-terminal-selection: rgba(124, 156, 255, 0.24);
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.18);
+  --shadow-md: 0 18px 48px rgba(0, 0, 0, 0.28);
+  --shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.36);
+  --focus-ring: 0 0 0 1px rgba(124, 156, 255, 0.45), 0 0 0 4px rgba(124, 156, 255, 0.14);
 }

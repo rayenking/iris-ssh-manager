@@ -1,12 +1,23 @@
 import { Channel } from '@tauri-apps/api/core';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { tauriApi } from '../lib/tauri';
 import type { TabStatus } from '../types/terminal';
 
 type LocalShellDataHandler = (data: number[]) => void;
 
+const LOCAL_SHELL_STARTUP_TIMEOUT_MS = 10_000;
+
 function isMissingSessionError(error: unknown) {
   return error instanceof Error && error.message.includes('local shell session not found');
+}
+
+function withStartupTimeout<T>(promise: Promise<T>, message: string, timeoutMs: number) {
+  return Promise.race<T>([
+    promise,
+    new Promise<T>((_, reject) => {
+      window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    }),
+  ]);
 }
 
 export function useLocalShell() {
@@ -29,7 +40,11 @@ export function useLocalShell() {
     };
 
     try {
-      const sessionId = await tauriApi.localShellOpen(channel, cols, rows);
+      const sessionId = await withStartupTimeout(
+        tauriApi.localShellOpen(channel, cols, rows),
+        'Local shell startup timed out',
+        LOCAL_SHELL_STARTUP_TIMEOUT_MS,
+      );
       activeSessionIdRef.current = sessionId;
       setConnectionState('connected');
       return sessionId;
@@ -38,6 +53,33 @@ export function useLocalShell() {
       setConnectionState('error');
       setError(message);
       throw openError;
+    }
+  }, []);
+
+  const attach = useCallback(async (sessionId: string, cols: number, rows: number, onData: LocalShellDataHandler) => {
+    setConnectionState('connecting');
+    setError(null);
+
+    const channel = new Channel<number[]>();
+    channel.onmessage = (data) => {
+      if (data.length === 0) {
+        activeSessionIdRef.current = null;
+        setConnectionState('disconnected');
+      }
+
+      onData(data);
+    };
+
+    try {
+      await tauriApi.localShellAttach(channel, sessionId, cols, rows);
+      activeSessionIdRef.current = sessionId;
+      setConnectionState('connected');
+      return sessionId;
+    } catch (attachError) {
+      const message = attachError instanceof Error ? attachError.message : 'Failed to attach local shell';
+      setConnectionState('error');
+      setError(message);
+      throw attachError;
     }
   }, []);
 
@@ -89,21 +131,9 @@ export function useLocalShell() {
     }
   }, []);
 
-  useEffect(() => () => {
-    const sessionId = activeSessionIdRef.current;
-
-    if (sessionId) {
-      void tauriApi.localShellDisconnect(sessionId).catch((disconnectError) => {
-        if (!isMissingSessionError(disconnectError)) {
-          console.error('Failed to disconnect local shell on cleanup:', disconnectError);
-        }
-      });
-      activeSessionIdRef.current = null;
-    }
-  }, []);
-
   return {
     open,
+    attach,
     write,
     resize,
     close,

@@ -37,6 +37,23 @@ function getDropDirection(e: DragEvent<HTMLDivElement>): PaneSplitDirection | nu
   return null;
 }
 
+type TabDragPayload = {
+  tabId: string;
+  paneId?: string;
+};
+
+function parseTabDragPayload(raw: string): TabDragPayload | null {
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as TabDragPayload;
+    if (!parsed?.tabId) return null;
+    return parsed;
+  } catch {
+    return { tabId: raw };
+  }
+}
+
 export function TerminalPane({ pane }: Props) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [dropZone, setDropZone] = useState<PaneSplitDirection | null>(null);
@@ -78,11 +95,12 @@ export function TerminalPane({ pane }: Props) {
   const handleCopyPasteReady = useCallback((handle: TerminalCopyPasteHandle) => {
     copyPasteRef.current = handle;
   }, []);
-  const focusedPaneId = useSplitStore((state) => state.focusedPaneId);
+  const focusedPaneId = useSplitStore((state) => state.focusedPaneIdByTabId[pane.tabId] ?? null);
   const splitTree = useSplitStore((state) => state.splitTrees[pane.tabId] ?? null);
   const setFocusedPane = useSplitStore((state) => state.setFocusedPane);
   const splitPane = useSplitStore((state) => state.splitPane);
   const closePane = useSplitStore((state) => state.closePane);
+  const movePaneToTab = useTerminalStore((state) => state.movePaneToTab);
   const updateTabStatus = useTerminalStore((state) => state.updateTabStatus);
   const setTabSessionId = useTerminalStore((state) => state.setTabSessionId);
 
@@ -135,11 +153,14 @@ export function TerminalPane({ pane }: Props) {
     const direction = getDropDirection(e);
     if (!direction) return;
 
-    const sourceTabId = e.dataTransfer.getData(TAB_DRAG_TYPE);
+    const tabPayload = parseTabDragPayload(e.dataTransfer.getData(TAB_DRAG_TYPE));
+    const sourceTabId = tabPayload?.tabId;
     if (sourceTabId) {
+      const sourcePaneId = tabPayload?.paneId ?? sourceTabId;
       const sourceTab = useTerminalStore.getState().tabs.find((t) => t.id === sourceTabId);
       if (!sourceTab || (sourceTab.kind !== 'terminal' && sourceTab.kind !== 'local-terminal')) return;
-      useSplitStore.getState().splitPaneWithConnection(pane.tabId, pane.id, direction, sourceTab.connectionId);
+      if (sourceTabId === pane.tabId && sourcePaneId === pane.id) return;
+      movePaneToTab(sourceTabId, sourcePaneId, pane.tabId, pane.id, direction);
       return;
     }
 
@@ -150,7 +171,7 @@ export function TerminalPane({ pane }: Props) {
         useSplitStore.getState().splitPaneWithConnection(pane.tabId, pane.id, direction, id);
       } catch { /* ignore */ }
     }
-  }, [pane.id, pane.tabId]);
+  }, [movePaneToTab, pane.id, pane.tabId]);
 
   const handleSplit = (direction: PaneSplitDirection) => {
     setContextMenu(null);
@@ -164,19 +185,17 @@ export function TerminalPane({ pane }: Props) {
 
   return (
     <div
-      onMouseDown={() => setFocusedPane(pane.id)}
+      onMouseDown={() => setFocusedPane(pane.tabId, pane.id)}
       onContextMenu={(event) => {
         event.preventDefault();
-        setFocusedPane(pane.id);
+        setFocusedPane(pane.tabId, pane.id);
         setHasSelection(copyPasteRef.current?.hasSelection() ?? false);
         setContextMenu({ x: event.clientX, y: event.clientY });
       }}
       onDragOver={handlePaneDragOver}
       onDragLeave={handlePaneDragLeave}
       onDrop={handlePaneDrop}
-      className={`group relative flex h-full min-h-0 min-w-0 flex-1 overflow-hidden border transition-colors ${
-        isFocused ? 'border-[var(--color-accent)]' : 'border-transparent'
-      }`}
+      className="group relative flex h-full min-h-0 min-w-0 flex-1 overflow-hidden border border-transparent transition-colors"
     >
       {externalDragActive && (
         <div

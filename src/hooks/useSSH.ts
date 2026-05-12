@@ -1,12 +1,23 @@
 import { Channel } from '@tauri-apps/api/core';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { tauriApi } from '../lib/tauri';
 import type { TabStatus } from '../types/terminal';
 
 type SshDataHandler = (data: number[]) => void;
 
+const SSH_STARTUP_TIMEOUT_MS = 60_000;
+
 function isMissingSessionError(error: unknown) {
   return error instanceof Error && error.message.includes('ssh session not found');
+}
+
+function withStartupTimeout<T>(promise: Promise<T>, message: string, timeoutMs: number) {
+  return Promise.race<T>([
+    promise,
+    new Promise<T>((_, reject) => {
+      window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    }),
+  ]);
 }
 
 export function useSSH() {
@@ -19,10 +30,22 @@ export function useSSH() {
     setError(null);
 
     const channel = new Channel<number[]>();
-    channel.onmessage = onData;
+    channel.onmessage = (data) => {
+      if (data.length === 0) {
+        activeSessionIdRef.current = null;
+        setConnectionState('disconnected');
+        return;
+      }
+
+      onData(data);
+    };
 
     try {
-      const sessionId = await tauriApi.sshConnect(connectionId, channel, cols, rows);
+      const sessionId = await withStartupTimeout(
+        tauriApi.sshConnect(connectionId, channel, cols, rows),
+        'SSH startup timed out',
+        SSH_STARTUP_TIMEOUT_MS,
+      );
       activeSessionIdRef.current = sessionId;
       setConnectionState('connected');
       return sessionId;
@@ -31,6 +54,34 @@ export function useSSH() {
       setConnectionState('error');
       setError(message);
       throw connectError;
+    }
+  }, []);
+
+  const attach = useCallback(async (sessionId: string, onData: SshDataHandler, cols?: number, rows?: number) => {
+    setConnectionState('connecting');
+    setError(null);
+
+    const channel = new Channel<number[]>();
+    channel.onmessage = (data) => {
+      if (data.length === 0) {
+        activeSessionIdRef.current = null;
+        setConnectionState('disconnected');
+        return;
+      }
+
+      onData(data);
+    };
+
+    try {
+      await tauriApi.sshAttach(sessionId, channel, cols, rows);
+      activeSessionIdRef.current = sessionId;
+      setConnectionState('connected');
+      return sessionId;
+    } catch (attachError) {
+      const message = attachError instanceof Error ? attachError.message : 'Failed to attach SSH session';
+      setConnectionState('error');
+      setError(message);
+      throw attachError;
     }
   }, []);
 
@@ -82,21 +133,9 @@ export function useSSH() {
     }
   }, []);
 
-  useEffect(() => () => {
-    const sessionId = activeSessionIdRef.current;
-
-    if (sessionId) {
-      void tauriApi.sshDisconnect(sessionId).catch((disconnectError) => {
-        if (!isMissingSessionError(disconnectError)) {
-          console.error('Failed to disconnect SSH session on cleanup:', disconnectError);
-        }
-      });
-      activeSessionIdRef.current = null;
-    }
-  }, []);
-
   return {
     connect,
+    attach,
     disconnect,
     write,
     resize,

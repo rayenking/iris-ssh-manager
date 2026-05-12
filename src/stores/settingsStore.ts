@@ -3,7 +3,6 @@ import { tauriApi } from '../lib/tauri';
 import { useUiStore } from './uiStore';
 import {
   getDefaultBindings,
-  getCurrentBindings,
   resetAllShortcutCombos,
   resetShortcutCombo,
   updateShortcutCombo,
@@ -166,14 +165,27 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   resetKeybinding: (action: string) => {
+    const defaults = getDefaultBindings();
+    const defaultCombo = defaults[action];
+
+    if (!defaultCombo) {
+      return;
+    }
+
     resetShortcutCombo(action);
-    set((state) => ({ keybindings: { ...state.keybindings, ...getCurrentBindings() } }));
+    set((state) => ({
+      keybindings: {
+        ...state.keybindings,
+        [action]: defaultCombo,
+      },
+    }));
     debounceSave(() => get().saveSettings());
   },
 
   resetKeybindingsToDefaults: () => {
+    const defaults = getDefaultBindings();
     resetAllShortcutCombos();
-    set({ keybindings: getDefaultBindings() });
+    set({ keybindings: defaults });
     debounceSave(() => get().saveSettings());
   },
 

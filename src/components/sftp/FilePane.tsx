@@ -1,4 +1,5 @@
-import { ArrowLeft, ArrowRight, ArrowUp, ChevronRight, Eye, EyeOff, File as FileIcon, Folder } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUp, ChevronRight, Eye, EyeOff } from 'lucide-react';
+import { FileEntryIcon } from '../file-icons/FileEntryIcon';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent, MouseEvent } from 'react';
 import type { FileEntry } from '../../types/sftp';
@@ -352,11 +353,7 @@ export function FilePane({
                 </div>
               )}
               <div className="flex min-w-0 items-center gap-2">
-                {entry.isDir ? (
-                  <Folder className="h-4 w-4 shrink-0 text-[var(--color-warning)]" />
-                ) : (
-                  <FileIcon className="h-4 w-4 shrink-0 text-[var(--color-text-muted)]" />
-                )}
+                <FileEntryIcon name={entry.name} isDir={entry.isDir} fullPath={joinPath(path, entry.name)} className="h-4 w-4" />
                 <span className="truncate">{entry.name}</span>
               </div>
               <div className="truncate text-right text-[var(--color-text-secondary)]">{entry.isDir ? '—' : formatBytes(entry.size)}</div>

@@ -7,10 +7,12 @@ use russh::client;
 use russh::{Channel, ChannelId, Disconnect};
 use tauri::ipc::Channel as TauriChannel;
 use tokio::sync::mpsc;
+use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 
-use super::auth::{authenticate, AuthMethod};
+use super::auth::{AuthMethod, authenticate};
 use super::tunnel::{TunnelManager, forwarded_channel_sender};
 
 const READ_BATCH_LIMIT: usize = 8 * 1024;
@@ -18,7 +20,7 @@ const READ_BATCH_LIMIT: usize = 8 * 1024;
 #[derive(Default)]
 pub(crate) struct SharedHandlerState {
     shell_channel_id: Option<ChannelId>,
-    output_tx: Option<mpsc::UnboundedSender<Vec<u8>>>,
+    output_tx: Option<UnboundedSender<Vec<u8>>>,
     forwarded_channel_tx: Option<mpsc::UnboundedSender<super::tunnel::IncomingForwardedChannel>>,
 }
 
@@ -71,20 +73,44 @@ impl client::Handler for SshHandler {
         self.forward_remote_channel(channel, connected_port as u16).await;
         Ok(())
     }
+
+    async fn channel_eof(
+        &mut self,
+        channel: ChannelId,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        self.forward_eof(channel).await;
+        Ok(())
+    }
+
+    async fn channel_close(
+        &mut self,
+        channel: ChannelId,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        self.forward_eof(channel).await;
+        Ok(())
+    }
 }
 
 impl SshHandler {
-    async fn forward_data(&self, channel: ChannelId, data: &[u8]) {
-        let sender = {
-            let state = self.shared.lock().await;
-            if state.shell_channel_id != Some(channel) {
-                return;
-            }
-            state.output_tx.clone()
-        };
+    async fn shell_output_sender(&self, channel: ChannelId) -> Option<UnboundedSender<Vec<u8>>> {
+        let state = self.shared.lock().await;
+        if state.shell_channel_id != Some(channel) {
+            return None;
+        }
+        state.output_tx.clone()
+    }
 
-        if let Some(sender) = sender {
+    async fn forward_data(&self, channel: ChannelId, data: &[u8]) {
+        if let Some(sender) = self.shell_output_sender(channel).await {
             let _ = sender.send(data.to_vec());
+        }
+    }
+
+    async fn forward_eof(&self, channel: ChannelId) {
+        if let Some(sender) = self.shell_output_sender(channel).await {
+            let _ = sender.send(Vec::new());
         }
     }
 
@@ -99,7 +125,7 @@ pub struct SshSession {
     pub(crate) handle: Option<Arc<Mutex<client::Handle<SshHandler>>>>,
     shell_channel: Option<Channel<client::Msg>>,
     handler_state: Arc<Mutex<SharedHandlerState>>,
-    output_rx: Option<mpsc::UnboundedReceiver<Vec<u8>>>,
+    output_rx: Option<UnboundedReceiver<Vec<u8>>>,
     read_task: Option<JoinHandle<()>>,
     tunnel_manager: Arc<TunnelManager>,
     pub host: String,
@@ -107,13 +133,55 @@ pub struct SshSession {
     pub username: String,
 }
 
+fn spawn_reader_task(mut receiver: UnboundedReceiver<Vec<u8>>, channel: TauriChannel<Vec<u8>>) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut buffer = Vec::with_capacity(READ_BATCH_LIMIT);
+        let flush_interval = Duration::from_millis(8);
+
+        loop {
+            if buffer.is_empty() {
+                match receiver.recv().await {
+                    Some(chunk) => buffer.extend_from_slice(&chunk),
+                    None => break,
+                }
+            } else {
+                match tokio::time::timeout(flush_interval, receiver.recv()).await {
+                    Ok(Some(chunk)) => {
+                        buffer.extend_from_slice(&chunk);
+                    }
+                    Ok(None) => break,
+                    Err(_) => {
+                        if channel.send(std::mem::take(&mut buffer)).is_err() {
+                            break;
+                        }
+                        continue;
+                    }
+                }
+            }
+
+            if buffer.len() >= READ_BATCH_LIMIT {
+                if channel.send(std::mem::take(&mut buffer)).is_err() {
+                    break;
+                }
+            }
+        }
+
+        if !buffer.is_empty() {
+            let _ = channel.send(buffer);
+        }
+
+        let _ = channel.send(Vec::new());
+    })
+}
+
+async fn create_output_binding(handler_state: &Arc<Mutex<SharedHandlerState>>) -> UnboundedReceiver<Vec<u8>> {
+    let (output_tx, output_rx) = mpsc::unbounded_channel();
+    handler_state.lock().await.output_tx = Some(output_tx);
+    output_rx
+}
+
 impl SshSession {
-    pub async fn connect(
-        host: &str,
-        port: u16,
-        username: &str,
-        auth: AuthMethod,
-    ) -> Result<SshSession> {
+    pub async fn connect(host: &str, port: u16) -> Result<SshSession> {
         let config = Arc::new(client::Config {
             inactivity_timeout: None,
             keepalive_interval: Some(Duration::from_secs(15)),
@@ -123,22 +191,16 @@ impl SshSession {
 
         let handler = SshHandler::default();
         let handler_state = handler.shared.clone();
-        let (output_tx, output_rx) = mpsc::unbounded_channel();
+        let output_rx = create_output_binding(&handler_state).await;
         let (forwarded_channel_tx, forwarded_channel_rx) = forwarded_channel_sender();
         {
             let mut state = handler_state.lock().await;
-            state.output_tx = Some(output_tx);
             state.forwarded_channel_tx = Some(forwarded_channel_tx);
         }
 
-        let mut handle = client::connect(config, (host, port), handler)
+        let handle = client::connect(config, (host, port), handler)
             .await
             .with_context(|| format!("failed to connect to SSH server {host}:{port}"))?;
-
-        let authenticated = authenticate(&mut handle, username, &auth).await?;
-        if !authenticated {
-            return Err(anyhow!("SSH authentication was rejected by the server"));
-        }
 
         let handle = Arc::new(Mutex::new(handle));
         let tunnel_manager = Arc::new(TunnelManager::new(Arc::clone(&handle), forwarded_channel_rx));
@@ -152,8 +214,42 @@ impl SshSession {
             tunnel_manager,
             host: host.to_string(),
             port,
-            username: username.to_string(),
+            username: String::new(),
         })
+    }
+
+    pub async fn authenticate(&mut self, username: &str, auth: &AuthMethod) -> Result<()> {
+        let handle = Arc::clone(
+            self
+                .handle
+                .as_ref()
+                .ok_or_else(|| anyhow!("SSH session handle is not available"))?,
+        );
+
+        let mut handle = handle.lock().await;
+        let authenticated = authenticate(&mut handle, username, auth).await?;
+        if !authenticated {
+            return Err(anyhow!("SSH authentication was rejected by the server"));
+        }
+
+        self.username = username.to_string();
+        Ok(())
+    }
+
+    pub fn set_username(&mut self, username: &str) {
+        self.username = username.to_string();
+    }
+
+    pub fn username(&self) -> &str {
+        &self.username
+    }
+
+    pub fn host(&self) -> &str {
+        &self.host
+    }
+
+    pub fn port(&self) -> u16 {
+        self.port
     }
 
     pub async fn open_shell(&mut self, cols: u32, rows: u32) -> Result<()> {
@@ -190,49 +286,27 @@ impl SshSession {
     }
 
     pub fn start_reading(&mut self, channel: TauriChannel<Vec<u8>>) -> Result<()> {
-        let mut receiver = self
+        let receiver = self
             .output_rx
             .take()
             .ok_or_else(|| anyhow!("output reader has already been started"))?;
 
-        self.read_task = Some(tokio::spawn(async move {
-            let mut buffer = Vec::with_capacity(READ_BATCH_LIMIT);
-            let flush_interval = Duration::from_millis(8);
-
-            loop {
-                if buffer.is_empty() {
-                    match receiver.recv().await {
-                        Some(chunk) => buffer.extend_from_slice(&chunk),
-                        None => break,
-                    }
-                } else {
-                    match tokio::time::timeout(flush_interval, receiver.recv()).await {
-                        Ok(Some(chunk)) => {
-                            buffer.extend_from_slice(&chunk);
-                        }
-                        Ok(None) => break,
-                        Err(_) => {
-                            if channel.send(std::mem::take(&mut buffer)).is_err() {
-                                break;
-                            }
-                            continue;
-                        }
-                    }
-                }
-
-                if buffer.len() >= READ_BATCH_LIMIT {
-                    if channel.send(std::mem::take(&mut buffer)).is_err() {
-                        break;
-                    }
-                }
-            }
-
-            if !buffer.is_empty() {
-                let _ = channel.send(buffer);
-            }
-        }));
-
+        self.read_task = Some(spawn_reader_task(receiver, channel));
         Ok(())
+    }
+
+    pub fn detach_reading(&mut self) {
+        if let Some(task) = self.read_task.take() {
+            task.abort();
+        }
+    }
+
+    pub async fn attach_reading(&mut self, channel: TauriChannel<Vec<u8>>) {
+        self.detach_reading();
+        let receiver = create_output_binding(&self.handler_state).await;
+        self.output_rx = Some(receiver);
+        let next_receiver = self.output_rx.take().expect("output receiver must exist after binding");
+        self.read_task = Some(spawn_reader_task(next_receiver, channel));
     }
 
     pub async fn resize(&self, cols: u32, rows: u32) -> Result<()> {

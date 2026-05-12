@@ -11,6 +11,58 @@
   color-scheme: light;
 }
 
+:root {
+  --app-transition-fast: 160ms ease;
+  --app-transition-medium: 220ms ease;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-border) 88%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-text-muted) 50%, var(--color-border));
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+button,
+input,
+textarea,
+select {
+  transition:
+    background-color var(--app-transition-fast),
+    border-color var(--app-transition-fast),
+    color var(--app-transition-fast),
+    box-shadow var(--app-transition-fast),
+    transform var(--app-transition-fast);
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 select,
 select option {
   background-color: var(--color-bg-tertiary);
