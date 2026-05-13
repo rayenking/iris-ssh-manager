@@ -36,6 +36,11 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Verify Rust installation
+        run: |
+          rustc --version
+          cargo --version
+
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
@@ -49,7 +54,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install Linux system dependencies
