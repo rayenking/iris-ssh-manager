@@ -69,3 +69,9 @@ select option {
   color: var(--color-text-primary);
 }
 
+[draggable="true"] {
+  -webkit-user-drag: element;
+  -webkit-user-select: none;
+  user-select: none;
+}
+

@@ -227,9 +227,9 @@ function App() {
         className={`flex flex-1 min-h-0 ${activeResizePanel ? "cursor-col-resize select-none" : ""}`}
       >
         <div
-          className={`overflow-hidden border-r border-[var(--color-border)] flex flex-col bg-[var(--color-bg-secondary)] ${
+          className={`overflow-hidden flex flex-col bg-[var(--color-bg-secondary)] ${
             activeResizePanel === "snippets" ? "" : "transition-[width] duration-200"
-          } ${snippetsOpen ? "" : "border-r-0"}`}
+          }`}
           style={{ width: snippetsOpen ? snippetsWidth : 0 }}
         >
           {snippetsOpen && <SnippetManager />}
@@ -240,14 +240,14 @@ function App() {
             aria-orientation="vertical"
             aria-label="Resize snippets panel"
             onMouseDown={(event) => handlePanelResizeStart("snippets", event)}
-            className="w-1 shrink-0 cursor-col-resize bg-[var(--color-border)] transition-colors hover:bg-[var(--color-accent)]"
+            className="relative w-px shrink-0 cursor-col-resize bg-[var(--color-border)] transition-colors hover:bg-[var(--color-accent)] before:absolute before:inset-y-0 before:-inset-x-1 before:content-['']"
           />
         )}
 
         <div
-          className={`overflow-hidden border-r border-[var(--color-border)] flex flex-col bg-[var(--color-bg-secondary)] ${
+          className={`overflow-hidden flex flex-col bg-[var(--color-bg-secondary)] ${
             activeResizePanel === "explorer" ? "" : "transition-[width] duration-200"
-          } ${explorerOpen ? "" : "border-r-0"}`}
+          }`}
           style={{ width: explorerOpen ? explorerWidth : 0 }}
         >
           {explorerOpen && <FileExplorer />}
@@ -258,14 +258,14 @@ function App() {
             aria-orientation="vertical"
             aria-label="Resize explorer panel"
             onMouseDown={(event) => handlePanelResizeStart("explorer", event)}
-            className="w-1 shrink-0 cursor-col-resize bg-[var(--color-border)] transition-colors hover:bg-[var(--color-accent)]"
+            className="relative w-px shrink-0 cursor-col-resize bg-[var(--color-border)] transition-colors hover:bg-[var(--color-accent)] before:absolute before:inset-y-0 before:-inset-x-1 before:content-['']"
           />
         )}
 
         <div
-          className={`overflow-hidden border-r border-[var(--color-border)] flex flex-col bg-[var(--color-bg-secondary)] ${
+          className={`overflow-hidden flex flex-col bg-[var(--color-bg-secondary)] ${
             activeResizePanel === "code-review" ? "" : "transition-[width] duration-200"
-          } ${codeReviewOpen ? "" : "border-r-0"}`}
+          }`}
           style={{ width: codeReviewOpen ? codeReviewWidth : 0 }}
         >
           {codeReviewOpen && <CodeReviewPanel />}
@@ -276,7 +276,7 @@ function App() {
             aria-orientation="vertical"
             aria-label="Resize code review panel"
             onMouseDown={(event) => handlePanelResizeStart("code-review", event)}
-            className="w-1 shrink-0 cursor-col-resize bg-[var(--color-border)] transition-colors hover:bg-[var(--color-accent)]"
+            className="relative w-px shrink-0 cursor-col-resize bg-[var(--color-border)] transition-colors hover:bg-[var(--color-accent)] before:absolute before:inset-y-0 before:-inset-x-1 before:content-['']"
           />
         )}
 
@@ -376,9 +376,9 @@ function App() {
                 aria-orientation="vertical"
                 aria-label="Resize review diff panel"
                 onMouseDown={(event) => handlePanelResizeStart("review-diff", event)}
-                className="w-1 shrink-0 cursor-col-resize bg-[var(--color-border)] transition-colors hover:bg-[var(--color-accent)]"
+                className="relative w-px shrink-0 cursor-col-resize bg-[var(--color-border)] transition-colors hover:bg-[var(--color-accent)] before:absolute before:inset-y-0 before:-inset-x-1 before:content-['']"
               />
-              <div className="flex h-full shrink-0 overflow-hidden border-l border-[var(--color-border)] bg-[var(--color-bg-secondary)]" style={{ width: reviewDiffWidth }}>
+              <div className="flex h-full shrink-0 overflow-hidden bg-[var(--color-bg-secondary)]" style={{ width: reviewDiffWidth }}>
                 <ReviewDiffTab
                   tab={{
                     id: 'review-panel-diff',

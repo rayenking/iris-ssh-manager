@@ -47,6 +47,7 @@ function resolveCodeReviewSourceTabId(activeTab: ReturnType<typeof useTerminalSt
 
 export function TitleBar() {
   const [maximized, setMaximized] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [isMac, setIsMac] = useState(false);
   const [terminalPickerOpen, setTerminalPickerOpen] = useState(false);
   const [terminalModalOpen, setTerminalModalOpen] = useState(false);
@@ -152,12 +153,14 @@ export function TitleBar() {
     } catch {}
 
     const win = getCurrentWindow();
-    win.isMaximized().then(setMaximized);
+    const syncWindowState = () => {
+      win.isMaximized().then(setMaximized);
+      win.isFullscreen().then(setFullscreen);
+    };
+    syncWindowState();
 
     let unlisten: (() => void) | null = null;
-    win.onResized(() => {
-      win.isMaximized().then(setMaximized);
-    }).then((fn) => {
+    win.onResized(syncWindowState).then((fn) => {
       unlisten = fn;
     });
 
@@ -327,7 +330,7 @@ export function TitleBar() {
   return (
     <>
       <div className="flex h-11 shrink-0 select-none items-center border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
-        {isMac ? <div className="w-[78px] shrink-0" /> : <div data-tauri-drag-region className="h-full w-2 shrink-0" />}
+        {isMac && !fullscreen ? <div className="w-[78px] shrink-0" /> : <div data-tauri-drag-region className="h-full w-2 shrink-0" />}
 
         <div className="flex shrink-0 items-center gap-1 px-2">
           <img src="/assets/logo.png" alt="" className="h-4 w-4" draggable={false} />
@@ -467,11 +470,9 @@ export function TitleBar() {
 
         <div data-tauri-drag-region className="h-full w-2 shrink-0" />
 
-        <div className="min-w-0 shrink-0">
+        <div className="min-w-0 flex-1">
           <TabBar className="px-1" />
         </div>
-
-        <div data-tauri-drag-region className="h-full min-w-0 flex-1" />
 
         <div data-tauri-drag-region className="h-full w-1 shrink-0" />
 
@@ -497,16 +498,14 @@ export function TitleBar() {
           >
             <Code className="h-4 w-4" />
           </button>
-          {!isMac && (
-            <button
-              className="ml-1 flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
-              title="Settings"
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-            >
-              <Settings className="h-4 w-4" />
-            </button>
-          )}
+          <button
+            className="ml-1 flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+            title="Settings"
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Settings className="h-4 w-4" />
+          </button>
         </div>
 
         {!isMac && (

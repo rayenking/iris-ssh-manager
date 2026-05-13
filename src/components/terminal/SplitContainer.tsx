@@ -30,7 +30,7 @@ interface DividerRect {
   parentBounds: { left: number; top: number; width: number; height: number };
 }
 
-const DIVIDER_PCT = 0.35;
+const DIVIDER_PCT = 0.1;
 
 function computeLayout(
   node: SplitNode,

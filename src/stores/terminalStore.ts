@@ -6,6 +6,7 @@ type TerminalLikeTab = TerminalTab | LocalTerminalTab;
 
 interface TerminalState {
   tabs: AppTab[];
+  tabOrder: string[];
   activeTabId: string | null;
 
   openTab: (connectionId: string, title: string) => void;
@@ -38,6 +39,7 @@ function getMergedTabTitle(sourceTitle: string, targetTitle: string) {
 
 export const useTerminalStore = create<TerminalState>((set) => ({
   tabs: [],
+  tabOrder: [],
   activeTabId: null,
 
   openTab: (connectionId, title) => {
@@ -54,6 +56,7 @@ export const useTerminalStore = create<TerminalState>((set) => ({
 
     set((state) => ({
       tabs: [...state.tabs, newTab],
+      tabOrder: [...state.tabOrder, newTab.id],
       activeTabId: newTab.id,
     }));
   },
@@ -72,6 +75,7 @@ export const useTerminalStore = create<TerminalState>((set) => ({
 
     set((state) => ({
       tabs: [...state.tabs, newTab],
+      tabOrder: [...state.tabOrder, newTab.id],
       activeTabId: newTab.id,
     }));
   },
@@ -116,6 +120,7 @@ export const useTerminalStore = create<TerminalState>((set) => ({
 
       return {
         tabs: nextTabs,
+        tabOrder: state.tabOrder.filter((id) => nextTabs.some((t) => t.id === id)),
         activeTabId: targetTabId,
       };
     });
@@ -202,6 +207,7 @@ export const useTerminalStore = create<TerminalState>((set) => ({
       }
 
       const newTabs = state.tabs.filter((tab) => !tabsToRemove.has(tab.id));
+      const newTabOrder = state.tabOrder.filter((tabId) => !tabsToRemove.has(tabId));
       const activeTabRemoved = state.activeTabId ? tabsToRemove.has(state.activeTabId) : false;
       const nextActiveTabId = activeTabRemoved
         ? newTabs.length > 0
@@ -220,6 +226,7 @@ export const useTerminalStore = create<TerminalState>((set) => ({
 
       return {
         tabs: newTabs,
+        tabOrder: newTabOrder,
         activeTabId: nextActiveTabId,
       };
     });
@@ -252,10 +259,10 @@ export const useTerminalStore = create<TerminalState>((set) => ({
 
   reorderTabs: (fromIndex, toIndex) => {
     set((state) => {
-      const newTabs = [...state.tabs];
-      const [movedTab] = newTabs.splice(fromIndex, 1);
-      newTabs.splice(toIndex, 0, movedTab);
-      return { tabs: newTabs };
+      const newOrder = [...state.tabOrder];
+      const [movedId] = newOrder.splice(fromIndex, 1);
+      newOrder.splice(toIndex, 0, movedId);
+      return { tabOrder: newOrder };
     });
   },
 }));

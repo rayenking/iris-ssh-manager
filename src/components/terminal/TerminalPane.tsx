@@ -1,28 +1,179 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
-import { Copy, ClipboardPaste, PanelBottom, PanelLeft, PanelRight, PanelTop, X } from 'lucide-react';
+import { Copy, ClipboardPaste, PanelBottom, PanelLeft, PanelRight, PanelTop, X, ChevronRight, Split, Network } from 'lucide-react';
 import { useSplitStore, getPrimaryPaneId, type PaneSplitDirection } from '../../stores/splitStore';
 import type { SplitLeaf } from '../../types/split';
 import { useTerminalStore } from '../../stores/terminalStore';
+import { useConnectionStore } from '../../stores/connectionStore';
 import { TerminalView, type TerminalCopyPasteHandle } from './TerminalView';
 import { LocalTerminalView } from './LocalTerminalView';
 import { TAB_DRAG_TYPE } from '../layout/TabBar';
 import { CONNECTION_DRAG_TYPE } from '../connections/ConnectionCard';
+import { getActiveDragKind, getActiveDragPayload, isAnyDragActive, endDrag } from '../../lib/dragTracking';
 
 interface Props {
   pane: SplitLeaf;
 }
 
-const splitItems: Array<{
+const splitDirections: Array<{
   direction: PaneSplitDirection;
   label: string;
   Icon: typeof PanelRight;
 }> = [
-  { direction: 'right', label: 'Split Right', Icon: PanelRight },
-  { direction: 'down', label: 'Split Down', Icon: PanelBottom },
-  { direction: 'left', label: 'Split Left', Icon: PanelLeft },
-  { direction: 'up', label: 'Split Up', Icon: PanelTop },
+  { direction: 'right', label: 'Right', Icon: PanelRight },
+  { direction: 'down', label: 'Down', Icon: PanelBottom },
+  { direction: 'left', label: 'Left', Icon: PanelLeft },
+  { direction: 'up', label: 'Up', Icon: PanelTop },
 ];
+
+interface TerminalContextMenuProps {
+  x: number;
+  y: number;
+  menuRef: React.RefObject<HTMLDivElement | null>;
+  hasSelection: boolean;
+  isOnlyPane: boolean;
+  onCopy: () => void;
+  onPaste: () => void;
+  onSplit: (direction: PaneSplitDirection) => void;
+  onSplitWithConnection: (connectionId: string, direction: PaneSplitDirection) => void;
+  onClose: () => void;
+}
+
+function TerminalContextMenu({ x, y, menuRef, hasSelection, isOnlyPane, onCopy, onPaste, onSplit, onSplitWithConnection, onClose }: TerminalContextMenuProps) {
+  const [submenu, setSubmenu] = useState<'split' | 'connection' | null>(null);
+  const [selectedConnection, setSelectedConnection] = useState<string | null>(null);
+  const connections = useConnectionStore((state) => state.connections);
+
+  return (
+    <div
+      ref={menuRef}
+      className="fixed z-50 w-52 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-1 shadow-xl"
+      style={{ top: y, left: x }}
+    >
+      {/* Copy */}
+      <button
+        type="button"
+        disabled={!hasSelection}
+        onClick={onCopy}
+        className="flex w-full items-center px-3 py-1.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] disabled:opacity-40 disabled:cursor-default disabled:hover:bg-transparent"
+      >
+        <Copy className="mr-2.5 h-3.5 w-3.5 text-[var(--color-text-muted)]" />
+        <span className="flex-1">Copy</span>
+        <span className="text-[11px] text-[var(--color-text-muted)]">⌘⇧C</span>
+      </button>
+
+      {/* Paste */}
+      <button
+        type="button"
+        onClick={onPaste}
+        className="flex w-full items-center px-3 py-1.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)]"
+      >
+        <ClipboardPaste className="mr-2.5 h-3.5 w-3.5 text-[var(--color-text-muted)]" />
+        <span className="flex-1">Paste</span>
+        <span className="text-[11px] text-[var(--color-text-muted)]">⌘⇧V</span>
+      </button>
+
+      <div className="my-1 border-t border-[var(--color-border)]" />
+
+      {/* Split — with submenu */}
+      <div
+        className="relative"
+        onMouseEnter={() => { setSubmenu('split'); setSelectedConnection(null); }}
+        onMouseLeave={() => { if (submenu === 'split') setSubmenu(null); }}
+      >
+        <button
+          type="button"
+          className="flex w-full items-center px-3 py-1.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)]"
+        >
+          <Split className="mr-2.5 h-3.5 w-3.5 text-[var(--color-text-muted)]" />
+          <span className="flex-1">Split</span>
+          <ChevronRight className="h-3.5 w-3.5 text-[var(--color-text-muted)]" />
+        </button>
+        {submenu === 'split' && (
+          <div className="absolute left-full top-0 z-50 ml-0.5 w-40 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-1 shadow-xl">
+            {splitDirections.map(({ direction, label, Icon }) => (
+              <button
+                key={direction}
+                type="button"
+                onClick={() => onSplit(direction)}
+                className="flex w-full items-center px-3 py-1.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)]"
+              >
+                <Icon className="mr-2.5 h-3.5 w-3.5 text-[var(--color-text-muted)]" />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Split with SSH — with submenu */}
+      {connections.length > 0 && (
+        <div
+          className="relative"
+          onMouseEnter={() => { setSubmenu('connection'); setSelectedConnection(null); }}
+          onMouseLeave={() => { if (submenu === 'connection') setSubmenu(null); }}
+        >
+          <button
+            type="button"
+            className="flex w-full items-center px-3 py-1.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)]"
+          >
+            <Network className="mr-2.5 h-3.5 w-3.5 text-[var(--color-text-muted)]" />
+            <span className="flex-1">Split with SSH</span>
+            <ChevronRight className="h-3.5 w-3.5 text-[var(--color-text-muted)]" />
+          </button>
+          {submenu === 'connection' && (
+            <div className="absolute left-full top-0 z-50 ml-0.5 w-48 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-1 shadow-xl">
+              {connections.map((conn) => (
+                <div
+                  key={conn.id}
+                  className="relative"
+                  onMouseEnter={() => setSelectedConnection(conn.id)}
+                  onMouseLeave={() => setSelectedConnection(null)}
+                >
+                  <button
+                    type="button"
+                    className="flex w-full items-center px-3 py-1.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)]"
+                  >
+                    <span className="flex-1 truncate">{conn.name}</span>
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-muted)]" />
+                  </button>
+                  {selectedConnection === conn.id && (
+                    <div className="absolute left-full top-0 z-50 ml-0.5 w-36 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-1 shadow-xl">
+                      {splitDirections.map(({ direction, label, Icon }) => (
+                        <button
+                          key={direction}
+                          type="button"
+                          onClick={() => onSplitWithConnection(conn.id, direction)}
+                          className="flex w-full items-center px-3 py-1.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)]"
+                        >
+                          <Icon className="mr-2.5 h-3.5 w-3.5 text-[var(--color-text-muted)]" />
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="my-1 border-t border-[var(--color-border)]" />
+
+      {/* Close Pane */}
+      <button
+        type="button"
+        onClick={onClose}
+        className="flex w-full items-center px-3 py-1.5 text-left text-sm text-[var(--color-error)] hover:bg-[var(--color-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={isOnlyPane}
+      >
+        <X className="mr-2.5 h-3.5 w-3.5" />
+        Close Pane
+      </button>
+    </div>
+  );
+}
 
 function getDropDirection(e: DragEvent<HTMLDivElement>): PaneSplitDirection | null {
   const rect = e.currentTarget.getBoundingClientRect();
@@ -59,34 +210,32 @@ export function TerminalPane({ pane }: Props) {
   const [dropZone, setDropZone] = useState<PaneSplitDirection | null>(null);
   const [hasSelection, setHasSelection] = useState(false);
   const [externalDragActive, setExternalDragActive] = useState(false);
-  const dragCounterRef = useRef(0);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const copyPasteRef = useRef<TerminalCopyPasteHandle | null>(null);
 
   useEffect(() => {
-    const onEnter = (e: globalThis.DragEvent) => {
-      if (e.dataTransfer?.types.includes(TAB_DRAG_TYPE) || e.dataTransfer?.types.includes(CONNECTION_DRAG_TYPE)) {
-        dragCounterRef.current++;
+    const poll = () => {
+      const active = isAnyDragActive('tab', 'connection');
+      setExternalDragActive((prev) => (prev !== active ? active : prev));
+    };
+    const timer = window.setInterval(poll, 100);
+    const onStart = (e: globalThis.DragEvent) => {
+      const types = e.dataTransfer?.types;
+      if (types && (types.includes(TAB_DRAG_TYPE) || types.includes(CONNECTION_DRAG_TYPE))) {
         setExternalDragActive(true);
       }
     };
-    const onLeave = () => {
-      dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
-      if (dragCounterRef.current === 0) setExternalDragActive(false);
-    };
     const onEnd = () => {
-      dragCounterRef.current = 0;
       setExternalDragActive(false);
     };
 
-    document.addEventListener('dragenter', onEnter);
-    document.addEventListener('dragleave', onLeave);
+    document.addEventListener('dragstart', onStart);
     document.addEventListener('dragend', onEnd);
     document.addEventListener('drop', onEnd);
 
     return () => {
-      document.removeEventListener('dragenter', onEnter);
-      document.removeEventListener('dragleave', onLeave);
+      window.clearInterval(timer);
+      document.removeEventListener('dragstart', onStart);
       document.removeEventListener('dragend', onEnd);
       document.removeEventListener('drop', onEnd);
     };
@@ -131,8 +280,8 @@ export function TerminalPane({ pane }: Props) {
   }, [contextMenu]);
 
   const handlePaneDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
-    const hasTab = e.dataTransfer.types.includes(TAB_DRAG_TYPE);
-    const hasConnection = e.dataTransfer.types.includes(CONNECTION_DRAG_TYPE);
+    const hasTab = e.dataTransfer.types.includes(TAB_DRAG_TYPE) || isAnyDragActive('tab');
+    const hasConnection = e.dataTransfer.types.includes(CONNECTION_DRAG_TYPE) || isAnyDragActive('connection');
     if (!hasTab && !hasConnection) return;
     e.preventDefault();
     e.stopPropagation();
@@ -153,7 +302,9 @@ export function TerminalPane({ pane }: Props) {
     const direction = getDropDirection(e);
     if (!direction) return;
 
-    const tabPayload = parseTabDragPayload(e.dataTransfer.getData(TAB_DRAG_TYPE));
+    const activeKind = getActiveDragKind();
+    const tabRaw = e.dataTransfer.getData(TAB_DRAG_TYPE) || (activeKind === 'tab' ? getActiveDragPayload() ?? '' : '');
+    const tabPayload = parseTabDragPayload(tabRaw);
     const sourceTabId = tabPayload?.tabId;
     if (sourceTabId) {
       const sourcePaneId = tabPayload?.paneId ?? sourceTabId;
@@ -164,7 +315,7 @@ export function TerminalPane({ pane }: Props) {
       return;
     }
 
-    const connectionRaw = e.dataTransfer.getData(CONNECTION_DRAG_TYPE);
+    const connectionRaw = e.dataTransfer.getData(CONNECTION_DRAG_TYPE) || (activeKind === 'connection' ? getActiveDragPayload() ?? '' : '');
     if (connectionRaw) {
       try {
         const { id } = JSON.parse(connectionRaw) as { id: string; name: string };
@@ -172,6 +323,57 @@ export function TerminalPane({ pane }: Props) {
       } catch { /* ignore */ }
     }
   }, [movePaneToTab, pane.id, pane.tabId]);
+
+  const handleOverlayPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isAnyDragActive('tab', 'connection')) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    const edgeThreshold = 0.25;
+
+    let direction: PaneSplitDirection | null = null;
+    if (x < edgeThreshold && x < y && x < (1 - y)) direction = 'left';
+    else if (x > (1 - edgeThreshold) && (1 - x) < y && (1 - x) < (1 - y)) direction = 'right';
+    else if (y < edgeThreshold) direction = 'up';
+    else if (y > (1 - edgeThreshold)) direction = 'down';
+
+    setDropZone(direction);
+  }, []);
+
+  const handleOverlayPointerUp = useCallback((_e: React.PointerEvent<HTMLDivElement>) => {
+    const kind = getActiveDragKind();
+    const payload = getActiveDragPayload();
+    const direction = dropZone;
+
+    setDropZone(null);
+    endDrag();
+
+    if (!direction || !payload) return;
+
+    if (kind === 'tab') {
+      const tabPayload = parseTabDragPayload(payload);
+      const sourceTabId = tabPayload?.tabId;
+      if (sourceTabId) {
+        const sourcePaneId = tabPayload?.paneId ?? sourceTabId;
+        const sourceTab = useTerminalStore.getState().tabs.find((t) => t.id === sourceTabId);
+        if (!sourceTab || (sourceTab.kind !== 'terminal' && sourceTab.kind !== 'local-terminal')) return;
+        if (sourceTabId === pane.tabId && sourcePaneId === pane.id) return;
+        movePaneToTab(sourceTabId, sourcePaneId, pane.tabId, pane.id, direction);
+      }
+      return;
+    }
+
+    if (kind === 'connection') {
+      try {
+        const { id } = JSON.parse(payload) as { id: string; name: string };
+        useSplitStore.getState().splitPaneWithConnection(pane.tabId, pane.id, direction, id);
+      } catch { /* ignore */ }
+    }
+  }, [dropZone, movePaneToTab, pane.id, pane.tabId]);
+
+  const handleOverlayPointerLeave = useCallback(() => {
+    setDropZone(null);
+  }, []);
 
   const handleSplit = (direction: PaneSplitDirection) => {
     setContextMenu(null);
@@ -200,6 +402,9 @@ export function TerminalPane({ pane }: Props) {
       {externalDragActive && (
         <div
           className="absolute inset-0 z-20"
+          onPointerMove={handleOverlayPointerMove}
+          onPointerUp={handleOverlayPointerUp}
+          onPointerLeave={handleOverlayPointerLeave}
           onDragOver={handlePaneDragOver}
           onDragLeave={handlePaneDragLeave}
           onDrop={handlePaneDrop}
@@ -253,53 +458,21 @@ export function TerminalPane({ pane }: Props) {
       )}
 
       {contextMenu && (
-        <div
-          ref={menuRef}
-          className="fixed z-50 w-52 rounded border border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
-          style={{ top: contextMenu.y, left: contextMenu.x }}
-        >
-          <button
-            type="button"
-            disabled={!hasSelection}
-            onClick={() => { copyPasteRef.current?.copySelection(); setContextMenu(null); }}
-            className="flex w-full items-center px-4 py-2 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] disabled:opacity-40 disabled:cursor-default disabled:hover:bg-transparent"
-          >
-            <Copy className="mr-2 h-4 w-4" />
-            <span className="flex-1">Copy</span>
-            <span className="text-xs text-[var(--color-text-muted)]">Ctrl+Shift+C</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => { void copyPasteRef.current?.pasteClipboard(); setContextMenu(null); }}
-            className="flex w-full items-center px-4 py-2 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)]"
-          >
-            <ClipboardPaste className="mr-2 h-4 w-4" />
-            <span className="flex-1">Paste</span>
-            <span className="text-xs text-[var(--color-text-muted)]">Ctrl+Shift+V</span>
-          </button>
-          <div className="my-1 border-t border-[var(--color-border)]" />
-          {splitItems.map(({ direction, label, Icon }) => (
-            <button
-              key={direction}
-              type="button"
-              onClick={() => handleSplit(direction)}
-              className="flex w-full items-center px-4 py-2 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)]"
-            >
-              <Icon className="mr-2 h-4 w-4" />
-              {label}
-            </button>
-          ))}
-          <div className="my-1 border-t border-[var(--color-border)]" />
-          <button
-            type="button"
-            onClick={handleClose}
-            className="flex w-full items-center px-4 py-2 text-left text-sm text-[var(--color-error)] hover:bg-[var(--color-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={isOnlyPane}
-          >
-            <X className="mr-2 h-4 w-4" />
-            Close Pane
-          </button>
-        </div>
+        <TerminalContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          menuRef={menuRef}
+          hasSelection={hasSelection}
+          isOnlyPane={isOnlyPane}
+          onCopy={() => { copyPasteRef.current?.copySelection(); setContextMenu(null); }}
+          onPaste={() => { void copyPasteRef.current?.pasteClipboard(); setContextMenu(null); }}
+          onSplit={(direction) => { handleSplit(direction); }}
+          onSplitWithConnection={(connectionId, direction) => {
+            setContextMenu(null);
+            useSplitStore.getState().splitPaneWithConnection(pane.tabId, pane.id, direction, connectionId);
+          }}
+          onClose={handleClose}
+        />
       )}
     </div>
   );

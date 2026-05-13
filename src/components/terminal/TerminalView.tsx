@@ -313,8 +313,19 @@ export function TerminalView({
     void doConnect();
   }, [disconnect, doConnect, emitSessionChange]);
 
+  const doConnectRef = useRef(doConnect);
   useEffect(() => {
-    void doConnect();
+    doConnectRef.current = doConnect;
+  }, [doConnect]);
+
+  const disconnectRef = useRef(disconnect);
+  useEffect(() => {
+    disconnectRef.current = disconnect;
+  }, [disconnect]);
+
+  useEffect(() => {
+    if (mountedSessionIdRef.current || sessionIdRef.current) return;
+    void doConnectRef.current();
 
     return () => {
       if (reconnectTimerRef.current) {
@@ -323,19 +334,22 @@ export function TerminalView({
       }
 
       const sessionId = mountedSessionIdRef.current;
+      const paneStillExists = Boolean(useSplitStore.getState().paneRuntimeById[paneId]);
+      if (paneStillExists) return;
+
       mountedSessionIdRef.current = null;
       sessionIdRef.current = null;
 
-      const paneStillExists = Boolean(useSplitStore.getState().paneRuntimeById[paneId]);
-      if (!paneStillExists && sessionId) {
+      if (sessionId) {
         setPaneSessionId(paneId, undefined);
         emitSessionChange(undefined);
         emitStatusChange('disconnected');
         setPaneStatus(paneId, 'disconnected');
-        void disconnect(sessionId).catch(() => {});
+        void disconnectRef.current(sessionId).catch(() => {});
       }
     };
-  }, [disconnect, doConnect, emitSessionChange, emitStatusChange, paneId, setPaneSessionId, setPaneStatus]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paneId]);
 
   useEffect(() => {
     if (connectionState !== 'disconnected' || !autoReconnect) return;
@@ -390,7 +404,7 @@ export function TerminalView({
   return (
     <div ref={containerRef} data-pane-id={paneId} className="relative flex h-full w-full min-h-0 flex-1 bg-[var(--color-terminal-bg)]">
       <div className="relative flex h-full min-w-0 flex-1 flex-col">
-        <div ref={terminalHostRef} className="flex-1 min-h-0 overflow-hidden px-2 py-2" />
+        <div ref={terminalHostRef} className="flex-1 min-h-0 overflow-hidden pl-1 pt-1" />
 
         {connectionState === 'connected' && (
           <button

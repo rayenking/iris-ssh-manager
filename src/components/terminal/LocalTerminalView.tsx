@@ -337,23 +337,38 @@ export function LocalTerminalView({
     }
   }, [attach, emitSessionChange, emitStatusChange, handleStreamData, open, paneId, resize, setPaneCwd, setPaneSessionId, setPaneStatus]);
 
+  const doOpenRef = useRef(doOpen);
   useEffect(() => {
-    void doOpen();
+    doOpenRef.current = doOpen;
+  }, [doOpen]);
+
+  const closeRef = useRef(close);
+  useEffect(() => {
+    closeRef.current = close;
+  }, [close]);
+
+  useEffect(() => {
+    if (mountedSessionIdRef.current || sessionIdRef.current) return;
+    void doOpenRef.current();
 
     return () => {
       const sessionId = mountedSessionIdRef.current;
+      const paneStillExists = Boolean(useSplitStore.getState().paneRuntimeById[paneId]);
+      if (paneStillExists) return;
+
       mountedSessionIdRef.current = null;
       sessionIdRef.current = null;
-      const paneStillExists = Boolean(useSplitStore.getState().paneRuntimeById[paneId]);
-      if (!paneStillExists && sessionId) {
+
+      if (sessionId) {
         setPaneSessionId(paneId, undefined);
         emitSessionChange(undefined);
         emitStatusChange('disconnected');
         setPaneStatus(paneId, 'disconnected');
-        void close(sessionId).catch(() => {});
+        void closeRef.current(sessionId).catch(() => {});
       }
     };
-  }, [close, doOpen, emitSessionChange, emitStatusChange, paneId, setPaneSessionId, setPaneStatus]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paneId]);
 
   useEffect(() => {
     setPaneStatus(paneId, connectionState);
@@ -385,7 +400,7 @@ export function LocalTerminalView({
   return (
     <div ref={containerRef} data-pane-id={paneId} className="relative flex h-full w-full min-h-0 flex-1 bg-[var(--color-terminal-bg)]">
       <div className="relative flex h-full min-w-0 flex-1 flex-col">
-        <div ref={terminalHostRef} className="flex-1 min-h-0 overflow-hidden px-2 py-2" />
+        <div ref={terminalHostRef} className="flex-1 min-h-0 overflow-hidden pl-1 pt-1" />
 
         {connectionState === 'connecting' && (
           <div className="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-bg-primary)_82%,transparent)]">

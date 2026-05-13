@@ -4,6 +4,7 @@ import type { Connection } from '../../types/connection';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useConnectionStore } from '../../stores/connectionStore';
 import { tauriApi } from '../../lib/tauri';
+import { beginDrag, endDrag, getActiveDragPayload, isDragActive } from '../../lib/dragTracking';
 import { Copy, Edit, Trash2 } from 'lucide-react';
 
 export const CONNECTION_DRAG_TYPE = 'application/x-iris-connection';
@@ -32,12 +33,19 @@ export function ConnectionCard({ connection, index, onReorder }: Props) {
   };
 
   const handleDragStart = (e: DragEvent<HTMLDivElement>) => {
-    e.dataTransfer.setData(CONNECTION_DRAG_TYPE, JSON.stringify({ id: connection.id, name: connection.name, index }));
+    const payload = JSON.stringify({ id: connection.id, name: connection.name, index });
+    e.dataTransfer.setData(CONNECTION_DRAG_TYPE, payload);
     e.dataTransfer.effectAllowed = 'move';
+    beginDrag('connection', payload);
+  };
+
+  const handleDragEnd = () => {
+    endDrag();
+    setDropIndicator(null);
   };
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
-    if (!e.dataTransfer.types.includes(CONNECTION_DRAG_TYPE)) return;
+    if (!e.dataTransfer.types.includes(CONNECTION_DRAG_TYPE) && !isDragActive('connection')) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     const rect = e.currentTarget.getBoundingClientRect();
@@ -52,7 +60,8 @@ export function ConnectionCard({ connection, index, onReorder }: Props) {
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDropIndicator(null);
-    const raw = e.dataTransfer.getData(CONNECTION_DRAG_TYPE);
+    const raw = e.dataTransfer.getData(CONNECTION_DRAG_TYPE) || getActiveDragPayload() || '';
+    endDrag();
     if (!raw) return;
     try {
       const source = JSON.parse(raw) as { id: string; name: string; index: number };
@@ -113,6 +122,7 @@ export function ConnectionCard({ connection, index, onReorder }: Props) {
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
         onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}

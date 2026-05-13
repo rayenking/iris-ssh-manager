@@ -1,14 +1,13 @@
 import { X } from 'lucide-react';
-import type { DragEvent } from 'react';
+import type { PointerEvent } from 'react';
 import type { AppTab, TerminalTab as TerminalTabType } from '../../types/terminal';
 
 interface Props {
   isActive: boolean;
+  isDragging?: boolean;
   onClose: () => void;
   onSelect: () => void;
-  onDragStart?: (e: DragEvent<HTMLDivElement>) => void;
-  onDragOver?: (e: DragEvent<HTMLDivElement>) => void;
-  onDrop?: (e: DragEvent<HTMLDivElement>) => void;
+  onPointerDown?: (e: PointerEvent<HTMLDivElement>) => void;
   dropIndicator?: 'left' | 'right' | null;
   tab: AppTab;
 }
@@ -29,17 +28,16 @@ function getStatusClasses(status: TerminalTabType['status']) {
   return 'bg-[var(--color-text-muted)]';
 }
 
-export function TerminalTab({ isActive, onClose, onSelect, onDragStart, onDragOver, onDrop, dropIndicator, tab }: Props) {
+export function TerminalTab({ isActive, isDragging, onClose, onPointerDown, dropIndicator, tab }: Props) {
   const statusDotClass = tab.kind === 'files' || tab.kind === 'review-diff' ? 'bg-[var(--color-accent)]' : getStatusClasses(tab.status);
 
   return (
     <div
-      draggable
-      onClick={onSelect}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+      data-tab-id={tab.id}
+      onPointerDown={onPointerDown}
       className={`group relative my-1 flex h-8 min-w-32 max-w-64 cursor-grab items-center rounded-full border px-3 select-none transition-colors active:cursor-grabbing ${
+        isDragging ? 'opacity-50' : ''
+      } ${
         isActive
           ? 'border-[var(--color-border)] bg-[var(--color-bg-primary)] shadow-sm'
           : 'border-transparent bg-transparent hover:border-[var(--color-border)] hover:bg-[var(--color-hover)]'
