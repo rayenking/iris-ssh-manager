@@ -63,11 +63,11 @@ Pre-built binaries for all platforms available on the [Releases page](https://gi
 ```bash
 git clone https://github.com/rayenking/irisx.git
 cd irisx
-npm install
-npm run tauri build
+pnpm install
+pnpm tauri build
 ```
 
-**Prerequisites:** Node.js 18+, Rust 1.70+, system dependencies (see below).
+**Prerequisites:** Node.js 18+, pnpm, Rust 1.70+, system dependencies (see below).
 
 <details>
 <summary>System dependencies (Linux)</summary>
@@ -86,19 +86,19 @@ sudo pacman -S webkit2gtk-4.1 libappindicator-gtk3 librsvg libsecret
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Run in development mode (Tauri + Vite hot reload)
-npm run tauri dev
+pnpm tauri dev
 
 # Type check
-npx tsc --noEmit
+pnpm exec tsc --noEmit
 
 # Rust check
 cd src-tauri && cargo check
 
 # Production build
-npm run tauri build
+pnpm tauri build
 ```
 
 ## Tech Stack
@@ -106,7 +106,7 @@ npm run tauri build
 | Layer | Technology |
 |-------|-----------|
 | Framework | Tauri 2.0 |
-| Backend | Rust (russh, rusqlite, tokio, keyring-core) |
+| Backend | Rust (russh, rusqlite, tokio, keyring-rs) |
 | Frontend | React 18 + TypeScript |
 | Styling | Tailwind CSS v4 (CSS-first config) |
 | Terminal | xterm.js + WebGL addon |
@@ -119,7 +119,7 @@ npm run tauri build
 src-tauri/src/
 ├── ssh/          # SSH session, SFTP, tunnels (russh)
 ├── db/           # SQLite with migrations (rusqlite)
-├── keychain/     # OS keychain (keyring-core)
+├── keychain/     # OS keychain (keyring-rs) + file-based store for dev builds
 ├── config/       # SSH config parser
 ├── commands/     # Tauri IPC command handlers
 └── lib.rs        # App setup, state management
