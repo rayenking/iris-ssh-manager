@@ -125,7 +125,7 @@ export function CodeReviewPanel() {
     if (!isLocalContext) {
       setStatusData(null);
       setReviewDiffFile(null);
-      setError(contextTab ? 'Code Review v1 hanya tersedia untuk Local Terminal.' : 'Buka Local Terminal di repo git untuk memakai Code Review.');
+      setError(contextTab ? 'Code Review v1 hanya tersedia untuk Terminal.' : 'Buka Terminal di repo git untuk memakai Code Review.');
       return () => {
         cancelled = true;
       };

@@ -5,7 +5,7 @@ import type { TabStatus } from '../types/terminal';
 
 type SshDataHandler = (data: number[]) => void;
 
-const SSH_STARTUP_TIMEOUT_MS = 60_000;
+const SSH_STARTUP_TIMEOUT_MS = 30_000;
 
 function isMissingSessionError(error: unknown) {
   return error instanceof Error && error.message.includes('ssh session not found');
@@ -133,10 +133,21 @@ export function useSSH() {
     }
   }, []);
 
+  const cancelConnect = useCallback(() => {
+    const sessionId = activeSessionIdRef.current;
+    activeSessionIdRef.current = null;
+    setConnectionState('disconnected');
+    setError(null);
+    if (sessionId) {
+      void tauriApi.sshDisconnect(sessionId).catch(() => {});
+    }
+  }, []);
+
   return {
     connect,
     attach,
     disconnect,
+    cancelConnect,
     write,
     resize,
     connectionState,

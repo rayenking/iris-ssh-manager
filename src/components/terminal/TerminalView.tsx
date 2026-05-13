@@ -69,7 +69,7 @@ export function TerminalView({
   const sessionChangeRef = useRef<(sessionId?: string) => void>(() => {});
   const [tunnelPanelOpen, setTunnelPanelOpen] = useState(false);
 
-  const { connect, attach, disconnect, write, resize, connectionState, error } = useSSH();
+  const { connect, attach, disconnect, cancelConnect, write, resize, connectionState, error } = useSSH();
   const { updateTabStatus, setTabSessionId, activeTabId: currentActiveTabId } = useTerminalStore();
   const paneRuntime = useSplitStore((state) => state.paneRuntimeById[paneId] ?? null);
   const { setPaneSessionId, setPaneCwd, setPaneStatus } = useSplitStore();
@@ -419,8 +419,15 @@ export function TerminalView({
 
         {connectionState === 'connecting' && (
           <div className="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-bg-primary)_82%,transparent)]">
-            <div className="rounded border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2 text-sm text-[var(--color-text-secondary)] shadow-lg">
-              Connecting...
+            <div className="flex flex-col items-center gap-3 rounded border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-6 py-4 text-sm text-[var(--color-text-secondary)] shadow-lg">
+              <span>Connecting...</span>
+              <button
+                type="button"
+                onClick={cancelConnect}
+                className="rounded border border-[var(--color-border)] px-3 py-1.5 text-xs text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         )}

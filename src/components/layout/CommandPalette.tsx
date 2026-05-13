@@ -90,7 +90,7 @@ export function CommandPalette() {
     },
     {
       id: 'action-local-terminal',
-      title: 'Local Terminal',
+      title: 'Terminal',
       type: 'action',
       icon: <Terminal className="w-4 h-4" />,
       onSelect: () => {

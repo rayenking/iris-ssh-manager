@@ -65,7 +65,7 @@ export const useTerminalStore = create<TerminalState>((set) => ({
     const newTab: LocalTerminalTab = {
       id: crypto.randomUUID(),
       connectionId: 'local',
-      title: 'Local Terminal',
+      title: 'Terminal',
       kind: 'local-terminal',
       status: 'connecting',
     };

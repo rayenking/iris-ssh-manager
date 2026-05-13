@@ -124,7 +124,7 @@ export function TitleBar() {
   );
   const pickerItems = useMemo<TerminalLaunchItem[]>(() => ([
     { id: 'new-connection', title: 'New Connection', subtitle: 'Add a saved SSH connection', kind: 'action' },
-    { id: 'local', title: 'Local Terminal', subtitle: 'Open a shell on this machine', kind: 'local' },
+    { id: 'local', title: 'Terminal', subtitle: 'Open a shell on this machine', kind: 'local' },
     ...quickConnections.map((connection) => ({
       id: connection.id,
       title: connection.name,
@@ -135,7 +135,7 @@ export function TitleBar() {
   ]), [quickConnections]);
   const modalItems = useMemo<TerminalLaunchItem[]>(() => ([
     { id: 'new-connection', title: 'New Connection', subtitle: 'Add a saved SSH connection', kind: 'action' },
-    { id: 'local', title: 'Local Terminal', subtitle: 'Open a shell on this machine', kind: 'local' },
+    { id: 'local', title: 'Terminal', subtitle: 'Open a shell on this machine', kind: 'local' },
     ...modalConnections.map((connection) => ({
       id: connection.id,
       title: connection.name,

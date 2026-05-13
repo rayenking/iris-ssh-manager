@@ -342,7 +342,7 @@ function App() {
                         <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]">
                           <Terminal className="h-4 w-4" />
                         </div>
-                        <div className="text-sm font-medium text-[var(--color-text-primary)]">Local Terminal</div>
+                        <div className="text-sm font-medium text-[var(--color-text-primary)]">Terminal</div>
                         <div className="mt-1 text-xs text-[var(--color-text-secondary)]">Open a shell on this machine right away.</div>
                       </button>
 
