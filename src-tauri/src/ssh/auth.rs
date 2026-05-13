@@ -1,9 +1,14 @@
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
 use russh::client;
+use russh::client::KeyboardInteractiveAuthResponse;
 use russh::keys::{self, PrivateKey};
+use tokio::time::timeout;
+
+const AUTH_METHOD_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Clone)]
 pub enum AuthMethod {
@@ -24,11 +29,9 @@ where
     H: client::Handler,
 {
     match method {
-        AuthMethod::Password(password) => session
-            .authenticate_password(username, password)
-            .await
-            .context("password authentication failed")
-            .map_err(Into::into),
+        AuthMethod::Password(password) => {
+            authenticate_with_password(session, username, password).await
+        }
         AuthMethod::PublicKey {
             key_path,
             passphrase,
@@ -42,6 +45,67 @@ where
         }
         AuthMethod::Agent => authenticate_with_agent(session, username).await,
     }
+}
+
+async fn authenticate_with_password<H>(
+    session: &mut client::Handle<H>,
+    username: &str,
+    password: &str,
+) -> Result<bool>
+where
+    H: client::Handler,
+{
+    // Try plain password auth first with a short timeout
+    let pw_result = timeout(
+        AUTH_METHOD_TIMEOUT,
+        session.authenticate_password(username, password),
+    )
+    .await;
+
+    match pw_result {
+        Ok(Ok(authenticated)) => return Ok(authenticated),
+        Ok(Err(error)) => return Err(error).context("password authentication failed"),
+        Err(_) => {
+            // Password auth timed out — server likely expects keyboard-interactive
+        }
+    }
+
+    // Fallback: try keyboard-interactive
+    let ki_result = timeout(
+        AUTH_METHOD_TIMEOUT,
+        session.authenticate_keyboard_interactive_start(username, None),
+    )
+    .await;
+
+    if let Ok(Ok(response)) = ki_result {
+        match response {
+            KeyboardInteractiveAuthResponse::Success => return Ok(true),
+            KeyboardInteractiveAuthResponse::Failure => return Ok(false),
+            KeyboardInteractiveAuthResponse::InfoRequest { prompts, .. } => {
+                let responses: Vec<String> = prompts
+                    .iter()
+                    .map(|_| password.to_string())
+                    .collect();
+
+                let reply_result = timeout(
+                    AUTH_METHOD_TIMEOUT,
+                    session.authenticate_keyboard_interactive_respond(responses),
+                )
+                .await;
+
+                if let Ok(Ok(reply)) = reply_result {
+                    return match reply {
+                        KeyboardInteractiveAuthResponse::Success => Ok(true),
+                        KeyboardInteractiveAuthResponse::Failure => Ok(false),
+                        KeyboardInteractiveAuthResponse::InfoRequest { .. } => Ok(false),
+                    };
+                }
+            }
+        }
+    }
+
+    // Both methods timed out or failed
+    Ok(false)
 }
 
 fn load_private_key(path: &PathBuf, passphrase: Option<&str>) -> Result<PrivateKey> {

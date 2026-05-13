@@ -276,7 +276,7 @@ export function TerminalView({
       const initialRows = terminal.rows || 24;
       const existingSessionId = paneRuntime?.sessionId;
 
-      let sessionId: string;
+      let sessionId: string | undefined;
       if (existingSessionId) {
         try {
           sessionId = await attach(existingSessionId, handleStreamData, initialCols, initialRows);
@@ -287,6 +287,8 @@ export function TerminalView({
       } else {
         sessionId = await connect(connectionId, handleStreamData, initialCols, initialRows);
       }
+
+      if (!sessionId) return;
 
       sessionIdRef.current = sessionId;
       mountedSessionIdRef.current = sessionId;

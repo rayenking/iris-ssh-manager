@@ -5,7 +5,7 @@ import type { TabStatus } from '../types/terminal';
 
 type SshDataHandler = (data: number[]) => void;
 
-const SSH_STARTUP_TIMEOUT_MS = 30_000;
+const SSH_STARTUP_TIMEOUT_MS = 15_000;
 
 function isMissingSessionError(error: unknown) {
   return error instanceof Error && error.message.includes('ssh session not found');
@@ -24,13 +24,16 @@ export function useSSH() {
   const [connectionState, setConnectionState] = useState<TabStatus>('disconnected');
   const [error, setError] = useState<string | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
+  const cancelledRef = useRef(false);
 
   const connect = useCallback(async (connectionId: string, onData: SshDataHandler, cols?: number, rows?: number) => {
+    cancelledRef.current = false;
     setConnectionState('connecting');
     setError(null);
 
     const channel = new Channel<number[]>();
     channel.onmessage = (data) => {
+      if (cancelledRef.current) return;
       if (data.length === 0) {
         activeSessionIdRef.current = null;
         setConnectionState('disconnected');
@@ -43,13 +46,20 @@ export function useSSH() {
     try {
       const sessionId = await withStartupTimeout(
         tauriApi.sshConnect(connectionId, channel, cols, rows),
-        'SSH startup timed out',
+        'Connection failed — check your password or verify the server is reachable.',
         SSH_STARTUP_TIMEOUT_MS,
       );
+
+      if (cancelledRef.current) {
+        void tauriApi.sshDisconnect(sessionId).catch(() => {});
+        return undefined;
+      }
+
       activeSessionIdRef.current = sessionId;
       setConnectionState('connected');
       return sessionId;
     } catch (connectError) {
+      if (cancelledRef.current) return undefined;
       const message = connectError instanceof Error ? connectError.message : 'Failed to connect SSH session';
       setConnectionState('error');
       setError(message);
@@ -134,6 +144,7 @@ export function useSSH() {
   }, []);
 
   const cancelConnect = useCallback(() => {
+    cancelledRef.current = true;
     const sessionId = activeSessionIdRef.current;
     activeSessionIdRef.current = null;
     setConnectionState('disconnected');

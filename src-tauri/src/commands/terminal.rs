@@ -12,7 +12,7 @@ use crate::ssh::pool::{SharedSshSession, SshPool};
 
 const SSH_CREDENTIAL_TIMEOUT: Duration = Duration::from_secs(5);
 const SSH_TRANSPORT_TIMEOUT: Duration = Duration::from_secs(10);
-const SSH_AUTH_TIMEOUT: Duration = Duration::from_secs(20);
+const SSH_AUTH_TIMEOUT: Duration = Duration::from_secs(10);
 const SSH_SHELL_TIMEOUT: Duration = Duration::from_secs(15);
 const SSH_START_READING_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -59,8 +59,8 @@ pub async fn ssh_connect(
         session.authenticate(&connection.username, &auth),
     )
     .await
-    .map_err(|_| format!("Timed out authenticating as {} on {}:{}", connection.username, connection.hostname, connection.port))?
-    .map_err(|error| error.to_string())?;
+    .map_err(|_| format!("Authentication failed for {} on {}:{}. The password may be incorrect, or the server did not respond in time.", connection.username, connection.hostname, connection.port))?
+    .map_err(|error| format!("Authentication rejected: {error}"))?;
 
     timeout(
         SSH_SHELL_TIMEOUT,
