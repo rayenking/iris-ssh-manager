@@ -120,7 +120,8 @@ fn load_git_diff(cwd: &str, file_path: &str) -> Result<GitDiffResponse, String> 
     if sections.is_empty() {
         let full_path = repo_root.join(file_path);
         if full_path.exists() && full_path.is_file() {
-            if let Ok(untracked) = run_git_allow_exit_code(repo_root.as_path(), ["diff", "--no-index", "--no-ext-diff", "--", "/dev/null", file_path]) {
+            let null_path = if cfg!(windows) { "NUL" } else { "/dev/null" };
+            if let Ok(untracked) = run_git_allow_exit_code(repo_root.as_path(), ["diff", "--no-index", "--no-ext-diff", "--", null_path, file_path]) {
                 if !untracked.trim().is_empty() {
                     sections.push(untracked);
                 }
