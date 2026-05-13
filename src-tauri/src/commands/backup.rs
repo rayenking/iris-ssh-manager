@@ -27,6 +27,7 @@ pub struct ExportData {
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct CredentialMap(HashMap<String, String>);
 
 fn encrypt_credentials(data: &str, passphrase: &str) -> Result<String, String> {

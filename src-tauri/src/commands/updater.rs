@@ -174,8 +174,10 @@ pub async fn install_update(app: tauri::AppHandle, file_path: String) -> Result<
         return Err("Update file not found".to_string());
     }
 
+    #[allow(unused_variables)]
     let current_exe = std::env::current_exe()
         .map_err(|e| format!("Cannot find current exe: {e}"))?;
+    #[allow(unused_variables)]
     let exe_path = current_exe.to_string_lossy().to_string();
 
     #[cfg(target_os = "linux")]
