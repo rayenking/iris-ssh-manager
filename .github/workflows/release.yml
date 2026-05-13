@@ -15,36 +15,23 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  publish-tauri:
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: ubuntu-22.04
-            target: linux
+            args: ''
           - platform: macos-latest
-            target: macos
+            args: '--target universal-apple-darwin'
           - platform: windows-latest
-            target: windows
+            args: ''
 
     runs-on: ${{ matrix.platform }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Verify Rust installation
-        run: |
-          rustc --version
-          cargo --version
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -57,8 +44,18 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
       - name: Install Linux system dependencies
-        if: matrix.target == 'linux'
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -69,89 +66,28 @@ jobs:
             patchelf
 
       - name: Install frontend dependencies
-        run: pnpm install
-
-      - name: Build Tauri app
-        run: pnpm tauri build
-
-      - name: Build AppImage (Linux only)
-        if: matrix.target == 'linux'
-        continue-on-error: true
-        run: pnpm tauri build -b appimage
-
-      - name: Upload Linux artifacts
-        if: matrix.target == 'linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-artifacts
-          path: |
-            src-tauri/target/release/bundle/deb/*.deb
-            src-tauri/target/release/bundle/appimage/*.AppImage
-          if-no-files-found: warn
-
-      - name: Upload macOS artifacts
-        if: matrix.target == 'macos'
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-artifacts
-          path: src-tauri/target/release/bundle/dmg/*.dmg
-          if-no-files-found: error
-
-      - name: Upload Windows artifacts
-        if: matrix.target == 'windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-artifacts
-          path: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/msi/*.msi
-          if-no-files-found: error
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: List downloaded artifacts
-        run: find artifacts -type f | head -50
-
-      - name: Flatten artifacts
-        run: |
-          mkdir -p release-files
-          find artifacts -type f \( -name '*.deb' -o -name '*.AppImage' -o -name '*.dmg' -o -name '*.exe' -o -name '*.msi' \) -exec cp {} release-files/ \;
-          ls -la release-files/
-
-      - name: Checkout for tag detection
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          path: repo
+        run: pnpm install --frozen-lockfile
 
       - name: Determine tag
         id: tag
+        shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.tag }}" ]]; then
             echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.event_name }}" == "push" ]]; then
             echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           else
-            cd repo
             TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
             echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: IrisX ${{ steps.tag.outputs.tag }}
-          draft: false
-          files: release-files/*
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ steps.tag.outputs.tag }}
+          releaseName: 'IrisX ${{ steps.tag.outputs.tag }}'
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
