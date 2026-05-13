@@ -4,6 +4,8 @@ export interface ChangedFile {
   path: string;
   status: GitFileStatus;
   staged: boolean;
+  addedLines: number;
+  removedLines: number;
 }
 
 export interface GitStatusResponse {

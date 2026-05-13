@@ -25,7 +25,7 @@ export function useLocalShell() {
   const [error, setError] = useState<string | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
 
-  const open = useCallback(async (cols: number, rows: number, onData: LocalShellDataHandler) => {
+  const open = useCallback(async (cols: number, rows: number, onData: LocalShellDataHandler, cwd?: string) => {
     setConnectionState('connecting');
     setError(null);
 
@@ -41,7 +41,7 @@ export function useLocalShell() {
 
     try {
       const sessionId = await withStartupTimeout(
-        tauriApi.localShellOpen(channel, cols, rows),
+        tauriApi.localShellOpen(channel, cols, rows, cwd),
         'Local shell startup timed out',
         LOCAL_SHELL_STARTUP_TIMEOUT_MS,
       );

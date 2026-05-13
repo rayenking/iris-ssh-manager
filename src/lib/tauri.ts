@@ -406,9 +406,9 @@ export const tauriApi = {
       ? invoke('ssh_resize', { sessionId, cols, rows })
       : Promise.resolve(),
 
-  localShellOpen: (channel: Channel<number[]>, cols: number, rows: number): Promise<string> =>
+  localShellOpen: (channel: Channel<number[]>, cols: number, rows: number, cwd?: string): Promise<string> =>
     isTauriRuntime()
-      ? invoke('local_shell_open', { onData: channel, cols, rows })
+      ? invoke('local_shell_open', { onData: channel, cols, rows, cwd: cwd ?? null })
       : Promise.reject(new Error('Local terminal is only available in the Tauri app.')),
 
   localShellAttach: (channel: Channel<number[]>, sessionId: string, cols: number, rows: number): Promise<void> =>

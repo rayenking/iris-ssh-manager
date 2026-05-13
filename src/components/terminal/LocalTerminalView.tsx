@@ -299,10 +299,10 @@ export function LocalTerminalView({
           sessionId = await attach(existingSessionId, cols, rows, handleStreamData);
         } catch {
           setPaneSessionId(paneId, undefined);
-          sessionId = await open(cols, rows, handleStreamData);
+          sessionId = await open(cols, rows, handleStreamData, paneRuntime?.cwd ?? undefined);
         }
       } else {
-        sessionId = await open(cols, rows, handleStreamData);
+        sessionId = await open(cols, rows, handleStreamData, paneRuntime?.cwd ?? undefined);
       }
 
       sessionIdRef.current = sessionId;

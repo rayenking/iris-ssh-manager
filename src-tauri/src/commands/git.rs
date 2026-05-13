@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -11,6 +12,8 @@ pub struct ChangedFile {
     path: String,
     status: String,
     staged: bool,
+    added_lines: usize,
+    removed_lines: usize,
 }
 
 #[derive(Serialize)]
@@ -60,6 +63,9 @@ fn load_git_status(cwd: &str) -> Result<GitStatusResponse, String> {
     let numstat_output = run_git(repo_root.as_path(), ["diff", "--numstat", "--cached", "--no-ext-diff"]).unwrap_or_default();
     let unstaged_numstat_output = run_git(repo_root.as_path(), ["diff", "--numstat", "--no-ext-diff"]).unwrap_or_default();
 
+    let staged_per_file = parse_numstat_per_file(&numstat_output);
+    let unstaged_per_file = parse_numstat_per_file(&unstaged_numstat_output);
+
     let mut files = Vec::new();
     for line in status_output.lines().filter(|line| !line.trim().is_empty()) {
         if line.len() < 4 {
@@ -78,7 +84,10 @@ fn load_git_status(cwd: &str) -> Result<GitStatusResponse, String> {
         let status = map_status(index_status, worktree_status).to_string();
         let staged = index_status != ' ' && index_status != '?';
 
-        files.push(ChangedFile { path, status, staged });
+        let (sa, sr) = staged_per_file.get(path.as_str()).copied().unwrap_or((0, 0));
+        let (ua, ur) = unstaged_per_file.get(path.as_str()).copied().unwrap_or((0, 0));
+
+        files.push(ChangedFile { path, status, staged, added_lines: sa + ua, removed_lines: sr + ur });
     }
 
     let (staged_added_lines, staged_removed_lines) = parse_numstat(&numstat_output);
@@ -106,6 +115,17 @@ fn load_git_diff(cwd: &str, file_path: &str) -> Result<GitDiffResponse, String> 
     }
     if !unstaged.trim().is_empty() {
         sections.push(unstaged);
+    }
+
+    if sections.is_empty() {
+        let full_path = repo_root.join(file_path);
+        if full_path.exists() && full_path.is_file() {
+            if let Ok(untracked) = run_git_allow_exit_code(repo_root.as_path(), ["diff", "--no-index", "--no-ext-diff", "--", "/dev/null", file_path]) {
+                if !untracked.trim().is_empty() {
+                    sections.push(untracked);
+                }
+            }
+        }
     }
 
     let diff = sections.join("\n\n");
@@ -157,6 +177,20 @@ where
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
+fn run_git_allow_exit_code<I, S>(cwd: &Path, args: I) -> Result<String, String>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<std::ffi::OsStr>,
+{
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .map_err(|error| format!("failed to run git in {}: {error}", cwd.display()))?;
+
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
 fn resolve_local_path(path: &str) -> Result<PathBuf, String> {
     let trimmed = path.trim();
     if trimmed.is_empty() {
@@ -182,6 +216,21 @@ fn parse_numstat(output: &str) -> (usize, usize) {
             let removed = parts.next().and_then(|value| value.parse::<usize>().ok()).unwrap_or(0);
             (added_total + added, removed_total + removed)
         })
+}
+
+fn parse_numstat_per_file(output: &str) -> HashMap<&str, (usize, usize)> {
+    let mut map = HashMap::new();
+    for line in output.lines() {
+        let mut parts = line.split('\t');
+        let added = parts.next().and_then(|v| v.parse::<usize>().ok()).unwrap_or(0);
+        let removed = parts.next().and_then(|v| v.parse::<usize>().ok()).unwrap_or(0);
+        if let Some(path) = parts.next() {
+            let entry = map.entry(path).or_insert((0_usize, 0_usize));
+            entry.0 += added;
+            entry.1 += removed;
+        }
+    }
+    map
 }
 
 fn map_status(index_status: char, worktree_status: char) -> &'static str {

@@ -158,11 +158,10 @@ export function CodeReviewPanel() {
         const nextStatus = await tauriApi.getGitStatus(repoRoot);
         if (!cancelled) {
           setStatusData(nextStatus);
-          const preferredPath = reviewDiffFile?.path && nextStatus.files.some((file) => file.path === reviewDiffFile.path)
-            ? reviewDiffFile.path
-            : (nextStatus.files[0]?.path ?? null);
-
-          setReviewDiffFile(preferredPath ? { path: preferredPath, repoRoot: nextStatus.repoRoot } : null);
+          const stillExists = reviewDiffFile?.path && nextStatus.files.some((file) => file.path === reviewDiffFile.path);
+          if (!stillExists) {
+            setReviewDiffFile(null);
+          }
         }
       } catch (nextError) {
         if (!cancelled) {
@@ -202,11 +201,10 @@ export function CodeReviewPanel() {
 
       const nextStatus = await tauriApi.getGitStatus(repoRoot);
       setStatusData(nextStatus);
-      const preferredPath = reviewDiffFile?.path && nextStatus.files.some((file) => file.path === reviewDiffFile.path)
-        ? reviewDiffFile.path
-        : (nextStatus.files[0]?.path ?? null);
-
-      setReviewDiffFile(preferredPath ? { path: preferredPath, repoRoot: nextStatus.repoRoot } : null);
+      const stillExists = reviewDiffFile?.path && nextStatus.files.some((file) => file.path === reviewDiffFile.path);
+      if (!stillExists) {
+        setReviewDiffFile(null);
+      }
     } catch (nextError) {
       setStatusData(null);
       setReviewDiffFile(null);
@@ -306,9 +304,17 @@ export function CodeReviewPanel() {
                       <div className="truncate text-[11px] leading-4 text-[var(--color-text-muted)]">{parent}</div>
                     ) : null}
                   </div>
-                  <span className={`shrink-0 pl-2 font-mono text-[11px] font-semibold uppercase ${getStatusClass(file.status)}`}>
-                    {file.status === '??' ? 'U' : file.status}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-1.5 pl-2">
+                    {file.addedLines > 0 ? (
+                      <span className="font-mono text-[10px] font-normal text-[var(--color-success)]">+{formatDiffCount(file.addedLines)}</span>
+                    ) : null}
+                    {file.removedLines > 0 ? (
+                      <span className="font-mono text-[10px] font-normal text-[var(--color-error)]">-{formatDiffCount(file.removedLines)}</span>
+                    ) : null}
+                    <span className={`font-mono text-[11px] font-semibold uppercase ${getStatusClass(file.status)}`}>
+                      {file.status === '??' ? 'U' : file.status}
+                    </span>
+                  </div>
                 </button>
               );
             })}

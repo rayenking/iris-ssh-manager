@@ -348,6 +348,7 @@ export const useSplitStore = create<SplitState>((set, get) => ({
           ...state.paneRuntimeById,
           [newPaneId]: {
             connectionId: sourceRuntime.connectionId,
+            cwd: sourceRuntime.cwd,
           },
         },
       };

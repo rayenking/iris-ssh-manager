@@ -255,6 +255,7 @@ pub async fn local_shell_open(
     on_data: Channel<Vec<u8>>,
     cols: u32,
     rows: u32,
+    cwd: Option<String>,
 ) -> Result<String, String> {
     let pty_system = native_pty_system();
     let pair = pty_system
@@ -266,6 +267,12 @@ pub async fn local_shell_open(
     command.env("TERM", "xterm-256color");
     if let Ok(lang) = env::var("LANG") {
         command.env("LANG", lang);
+    }
+    if let Some(ref dir) = cwd {
+        let path = std::path::Path::new(dir);
+        if path.is_dir() {
+            command.cwd(path);
+        }
     }
     let child = pair
         .slave
