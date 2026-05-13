@@ -146,7 +146,7 @@ export function TabBar({ className }: Props) {
   }, [dragTabId]);
 
   return (
-    <div className={cn('flex min-w-0 flex-1 items-center', className)}>
+    <div className={cn('flex min-w-0 flex-1 items-center h-full', className)}>
       <div
         ref={containerRef}
         className="flex min-w-max items-center gap-1 overflow-x-auto px-2"

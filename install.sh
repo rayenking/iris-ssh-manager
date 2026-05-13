@@ -181,4 +181,4 @@ case "$OS" in
     ;;
 esac
 
-info "Run: iris-ssh-manager"
+info "Run: irisx"

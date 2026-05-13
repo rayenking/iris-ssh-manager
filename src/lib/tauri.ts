@@ -376,6 +376,11 @@ export const tauriApi = {
       ? invoke('has_credential', { connectionId })
       : Promise.resolve(false),
 
+  sshTestConnection: (hostname: string, port: number, username: string, authMethod: string, password?: string, privateKeyPath?: string): Promise<void> =>
+    isTauriRuntime()
+      ? invoke('ssh_test_connection', { hostname, port, username, authMethod, password: password || null, privateKeyPath: privateKeyPath || null })
+      : Promise.reject(new Error('SSH connections are only available in the Tauri app.')),
+
   sshConnect: (connectionId: string, onData: Channel<number[]>, cols?: number, rows?: number): Promise<string> =>
     isTauriRuntime()
       ? invoke('ssh_connect', { connectionId, onData, cols, rows })
@@ -517,8 +522,14 @@ export const tauriApi = {
   localRename: (oldPath: string, newPath: string): Promise<void> =>
     isTauriRuntime() ? invoke('local_rename', { oldPath, newPath }) : Promise.resolve(),
 
+  localCopyFile: (source: string, dest: string): Promise<void> =>
+    isTauriRuntime() ? invoke('local_copy_file', { source, dest }) : Promise.resolve(),
+
   localMkdir: (path: string): Promise<void> =>
     isTauriRuntime() ? invoke('local_mkdir', { path }) : Promise.resolve(),
+
+  revealInFileManager: (path: string): Promise<void> =>
+    isTauriRuntime() ? invoke('reveal_in_file_manager', { path }) : Promise.resolve(),
 
   createTunnel: (sessionId: string, config: TunnelConfig): Promise<string> =>
     isTauriRuntime()

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Code, Copy, FolderGit2, FolderOpen, FolderTree, Minus, Plus, Search, Settings, Square, Terminal, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Code, Copy, Edit, FolderGit2, FolderOpen, FolderTree, Minus, Plus, Search, Settings, Square, Terminal, Trash2, X } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { platform } from '@tauri-apps/plugin-os';
 import { useUiStore } from '../../stores/uiStore';
@@ -70,7 +71,10 @@ export function TitleBar() {
   const { tabs, activeTabId, openFileBrowserTab, openLocalTab, openTab } = useTerminalStore();
   const connections = useConnectionStore((state) => state.connections);
   const fetchConnections = useConnectionStore((state) => state.fetchConnections);
+  const deleteConnection = useConnectionStore((state) => state.deleteConnection);
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
+  const [connContextMenu, setConnContextMenu] = useState<{ x: number; y: number; connection: Connection } | null>(null);
+  const connMenuRef = useRef<HTMLDivElement | null>(null);
 
   const handleToggleCodeReview = () => {
     const sourceTabId = resolveCodeReviewSourceTabId(activeTab);
@@ -233,6 +237,17 @@ export function TitleBar() {
     setModalSelectedIndex((current) => Math.min(current, Math.max(modalItems.length - 1, 0)));
   }, [modalItems.length]);
 
+  useEffect(() => {
+    if (!connContextMenu) return;
+    const handlePointerDown = (e: MouseEvent) => {
+      if (connMenuRef.current && !connMenuRef.current.contains(e.target as Node)) {
+        setConnContextMenu(null);
+      }
+    };
+    window.addEventListener('mousedown', handlePointerDown);
+    return () => window.removeEventListener('mousedown', handlePointerDown);
+  }, [connContextMenu]);
+
   const handleOpenConnectionForm = () => {
     window.dispatchEvent(new CustomEvent('open-connection-form', { detail: { connection: null } }));
   };
@@ -330,7 +345,7 @@ export function TitleBar() {
   return (
     <>
       <div className="flex h-11 shrink-0 select-none items-center border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
-        {isMac && !fullscreen ? <div className="w-[78px] shrink-0" /> : <div data-tauri-drag-region className="h-full w-2 shrink-0" />}
+        {isMac && !fullscreen ? <div data-tauri-drag-region className="w-[78px] h-full shrink-0" /> : <div data-tauri-drag-region className="h-full w-2 shrink-0" />}
 
         <div className="flex shrink-0 items-center gap-1 px-2">
           <img src="/assets/logo.png" alt="" className="h-4 w-4" draggable={false} />
@@ -431,6 +446,20 @@ export function TitleBar() {
                             launchItem(item);
                             setTerminalPickerOpen(false);
                           }}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (item.kind === 'connection') {
+                              setConnContextMenu({ x: e.clientX, y: e.clientY, connection: item.connection });
+                            }
+                          }}
+                          onMouseDown={(e) => {
+                            if (e.button === 2 && item.kind === 'connection') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setConnContextMenu({ x: e.clientX, y: e.clientY, connection: item.connection });
+                            }
+                          }}
                           className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-[var(--color-text-primary)] transition-colors ${
                             pickerSelectedIndex === index ? 'bg-[var(--color-hover)]' : 'hover:bg-[var(--color-hover)]'
                           }`}
@@ -463,6 +492,7 @@ export function TitleBar() {
                     Show all
                   </button>
                 </div>
+
               </div>
             )}
           </div>
@@ -470,7 +500,7 @@ export function TitleBar() {
 
         <div data-tauri-drag-region className="h-full w-2 shrink-0" />
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 h-full">
           <TabBar className="px-1" />
         </div>
 
@@ -609,6 +639,20 @@ export function TitleBar() {
                         launchItem(item);
                         setTerminalModalOpen(false);
                       }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (item.kind === 'connection') {
+                          setConnContextMenu({ x: e.clientX, y: e.clientY, connection: item.connection });
+                        }
+                      }}
+                      onMouseDown={(e) => {
+                        if (e.button === 2 && item.kind === 'connection') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setConnContextMenu({ x: e.clientX, y: e.clientY, connection: item.connection });
+                        }
+                      }}
                       className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-[var(--color-text-primary)] transition-colors ${
                         modalSelectedIndex === index ? 'bg-[var(--color-hover)]' : 'hover:bg-[var(--color-hover)]'
                       }`}
@@ -632,6 +676,43 @@ export function TitleBar() {
             </div>
           </div>
         </div>
+      )}
+      {connContextMenu && createPortal(
+        <div
+          ref={connMenuRef}
+          className="fixed z-[9999] min-w-[160px] rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
+          style={{ top: connContextMenu.y, left: connContextMenu.x }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)]"
+            onClick={() => {
+              const conn = connContextMenu.connection;
+              setConnContextMenu(null);
+              setTerminalPickerOpen(false);
+              setTerminalModalOpen(false);
+              window.dispatchEvent(new CustomEvent('open-connection-form', { detail: { connection: conn } }));
+            }}
+          >
+            <Edit className="h-3.5 w-3.5 text-[var(--color-text-muted)]" /> Edit
+          </button>
+          <div className="my-1 border-t border-[var(--color-border)]" />
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-400 hover:bg-red-500/10"
+            onClick={async () => {
+              const conn = connContextMenu.connection;
+              setConnContextMenu(null);
+              if (window.confirm(`Delete connection "${conn.name}"?`)) {
+                await deleteConnection(conn.id);
+              }
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Delete
+          </button>
+        </div>,
+        document.body,
       )}
     </>
   );

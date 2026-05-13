@@ -29,7 +29,16 @@ export function ConnectionCard({ connection, index, onReorder }: Props) {
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button === 2) {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({ x: e.clientX, y: e.clientY });
+    }
   };
 
   const handleDragStart = (e: DragEvent<HTMLDivElement>) => {
@@ -121,6 +130,7 @@ export function ConnectionCard({ connection, index, onReorder }: Props) {
         onClick={() => setSelected(connection.id)}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
+        onMouseDown={handleMouseDown}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDragOver={handleDragOver}

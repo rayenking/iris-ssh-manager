@@ -1,5 +1,5 @@
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
-import { ChevronRight, Eye, EyeOff, FolderTree, RefreshCw } from 'lucide-react';
+import { ChevronRight, Eye, EyeOff, FolderTree, RefreshCw, Terminal, FilePlus, FolderPlus, Copy, ClipboardPaste, Pencil, Trash2, FileText, ExternalLink } from 'lucide-react';
 import { FileEntryIcon } from '../file-icons/FileEntryIcon';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { tauriApi } from '../../lib/tauri';
@@ -17,7 +17,8 @@ interface TreeNode {
 interface ContextMenuState {
   x: number;
   y: number;
-  node: TreeNode;
+  node: TreeNode | null;
+  folderPath: string;
 }
 
 type DirectoryMap = Record<string, FileEntry[]>;
@@ -52,6 +53,11 @@ export function FileExplorer() {
   const [loadingPath, setLoadingPath] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
+  const [clipboardPath, setClipboardPath] = useState<string | null>(null);
+  const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [creatingIn, setCreatingIn] = useState<{ folder: string; type: 'file' | 'folder' } | null>(null);
+  const [createName, setCreateName] = useState('');
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
   const hasTerminalTab = activePaneKind === 'terminal' || activePaneKind === 'local-terminal';
@@ -252,6 +258,116 @@ export function FileExplorer() {
   }, [activePaneConnectionId, activePaneKind, activeTab, openFileBrowserTab]);
 
   const rootKey = activeCwd || (activePaneKind === 'local-terminal' ? '' : '.');
+
+  const handleRevealInFinder = useCallback(async (path: string) => {
+    try {
+      await tauriApi.revealInFileManager(path);
+    } catch {}
+  }, []);
+
+  const handleNewFile = useCallback(async (folderPath: string, name: string) => {
+    if (!name) return;
+    const filePath = joinPath(folderPath, name);
+    try {
+      if (activePaneKind === 'local-terminal') {
+        await tauriApi.localWriteFile(filePath, '');
+      } else if (activePaneKind === 'terminal' && activePaneSessionId) {
+        await tauriApi.sftpWriteFile(activePaneSessionId, filePath, '');
+      }
+      await loadDirectory(folderPath, true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create file');
+    }
+  }, [activePaneKind, activePaneSessionId, loadDirectory]);
+
+  const handleNewFolder = useCallback(async (folderPath: string, name: string) => {
+    if (!name) return;
+    const dirPath = joinPath(folderPath, name);
+    try {
+      if (activePaneKind === 'local-terminal') {
+        await tauriApi.localMkdir(dirPath);
+      } else if (activePaneKind === 'terminal' && activePaneSessionId) {
+        await tauriApi.sftpMkdir(activePaneSessionId, dirPath);
+      }
+      await loadDirectory(folderPath, true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create folder');
+    }
+  }, [activePaneKind, activePaneSessionId, loadDirectory]);
+
+  const handleRename = useCallback(async (oldPath: string, newName: string) => {
+    if (!newName) return;
+    const parent = getParentPath(oldPath) || rootKey;
+    const newPath = joinPath(parent, newName);
+    try {
+      if (activePaneKind === 'local-terminal') {
+        await tauriApi.localRename(oldPath, newPath);
+      } else if (activePaneKind === 'terminal' && activePaneSessionId) {
+        await tauriApi.sftpRename(activePaneSessionId, oldPath, newPath);
+      }
+      await loadDirectory(parent, true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to rename');
+    }
+    setRenamingPath(null);
+  }, [activePaneKind, activePaneSessionId, loadDirectory, rootKey]);
+
+  const handleDelete = useCallback(async (path: string) => {
+    const parent = getParentPath(path) || rootKey;
+    try {
+      if (activePaneKind === 'local-terminal') {
+        await tauriApi.localDelete(path);
+      } else if (activePaneKind === 'terminal' && activePaneSessionId) {
+        await tauriApi.sftpDelete(activePaneSessionId, path);
+      }
+      await loadDirectory(parent, true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete');
+    }
+  }, [activePaneKind, activePaneSessionId, loadDirectory, rootKey]);
+
+  const handlePaste = useCallback(async (destFolder: string) => {
+    if (!clipboardPath) return;
+    const fileName = clipboardPath.split(/[\\/]/).pop() || '';
+    const destPath = joinPath(destFolder, fileName);
+    try {
+      if (activePaneKind === 'local-terminal') {
+        await tauriApi.localCopyFile(clipboardPath, destPath);
+      } else if (activePaneKind === 'terminal' && activePaneSessionId) {
+        const content = await tauriApi.sftpReadFile(activePaneSessionId, clipboardPath);
+        await tauriApi.sftpWriteFile(activePaneSessionId, destPath, content);
+      }
+      await loadDirectory(destFolder, true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to paste');
+    }
+    setClipboardPath(null);
+  }, [activePaneKind, activePaneSessionId, clipboardPath, loadDirectory]);
+
+  const handleCopyRelativePath = useCallback(async (path: string) => {
+    const root = rootKey;
+    let relative = path;
+    if (root && root !== '.' && path.startsWith(root)) {
+      relative = path.slice(root.length).replace(/^[\\/]/, '');
+    }
+    try {
+      if (isTauriRuntime()) {
+        await writeText(relative);
+      } else {
+        await navigator.clipboard.writeText(relative);
+      }
+    } catch {}
+  }, [rootKey]);
+
+  const handleContextMenu = useCallback((event: React.MouseEvent, node: TreeNode | null) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const folderPath = node
+      ? (node.entry.isDir ? node.path : getParentPath(node.path) || rootKey)
+      : rootKey;
+    setContextMenu({ x: event.clientX, y: event.clientY, node, folderPath });
+  }, [rootKey]);
+
   const rootEntries = useMemo(
     () => filterEntries(directoryMap[rootKey] ?? [], showHidden),
     [directoryMap, rootKey, showHidden],
@@ -300,7 +416,7 @@ export function FileExplorer() {
           Waiting for the terminal to report its current directory
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto" onContextMenu={(event) => handleContextMenu(event, null)}>
           {activeCwd && activeCwd !== '/' && (
             <button
               type="button"
@@ -319,15 +435,13 @@ export function FileExplorer() {
             const isExpanded = expandedPaths.has(node.path);
             const childEntries = filterEntries(directoryMap[node.path] ?? [], showHidden);
             const isLoadingChildren = loadingPath === node.path;
+            const isRenaming = renamingPath === node.path;
 
             return (
               <div key={node.path}>
                 <div
-                  className="group flex items-center gap-1 pr-2 hover:bg-[var(--color-hover)]"
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    setContextMenu({ x: event.clientX, y: event.clientY, node });
-                  }}
+                  className="group flex items-center gap-1 pr-2 select-none cursor-default hover:bg-[var(--color-hover)]"
+                  onContextMenu={(event) => handleContextMenu(event, node)}
                 >
                   <div style={{ width: 10 + node.depth * 14 }} className="shrink-0" />
 
@@ -344,27 +458,41 @@ export function FileExplorer() {
                     <span className="w-4 shrink-0" />
                   )}
 
-                  <button
-                    type="button"
-                    className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left"
-                    onClick={() => {
-                      if (node.entry.isDir) {
-                        void handleToggleExpand(node.path);
-                        return;
-                      }
-
-                      void handleOpenFile(node.path);
-                    }}
-                    onDoubleClick={() => {
-                      if (node.entry.isDir) {
-                        void handleCdToPath(node.path);
-                      }
-                    }}
-                    title={node.path}
-                  >
-                    <FileEntryIcon name={node.entry.name} isDir={node.entry.isDir} fullPath={node.path} className="h-4 w-4" />
-                    <span className="truncate text-xs text-[var(--color-text-primary)]">{node.entry.name}</span>
-                  </button>
+                  {isRenaming ? (
+                    <input
+                      autoFocus
+                      className="min-w-0 flex-1 rounded border border-[var(--color-accent)] bg-[var(--color-bg-tertiary)] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)] outline-none"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { void handleRename(node.path, renameValue); }
+                        if (e.key === 'Escape') { setRenamingPath(null); }
+                      }}
+                      onBlur={() => setRenamingPath(null)}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left cursor-default"
+                      onClick={() => {
+                        if (node.entry.isDir) {
+                          void handleToggleExpand(node.path);
+                          return;
+                        }
+                        void handleOpenFile(node.path);
+                      }}
+                      onDoubleClick={() => {
+                        if (node.entry.isDir) {
+                          void handleCdToPath(node.path);
+                        }
+                      }}
+                      onContextMenu={(event) => handleContextMenu(event, node)}
+                      title={node.path}
+                    >
+                      <FileEntryIcon name={node.entry.name} isDir={node.entry.isDir} fullPath={node.path} className="h-4 w-4" />
+                      <span className="truncate text-xs text-[var(--color-text-primary)]">{node.entry.name}</span>
+                    </button>
+                  )}
 
                   <span className="shrink-0 text-[11px] text-[var(--color-text-muted)]">
                     {node.entry.isDir ? '' : formatBytes(node.entry.size)}
@@ -378,11 +506,65 @@ export function FileExplorer() {
                     <span className="shrink-0 text-[11px] text-[var(--color-text-muted)]">{childEntries.length}</span>
                   )}
                 </div>
+
+                {creatingIn && creatingIn.folder === node.path && node.entry.isDir && isExpanded && (
+                  <div className="flex items-center gap-1 pr-2" style={{ paddingLeft: 10 + (node.depth + 1) * 14 }}>
+                    <span className="w-4 shrink-0" />
+                    {creatingIn.type === 'folder' ? (
+                      <FolderPlus className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-muted)]" />
+                    ) : (
+                      <FilePlus className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-muted)]" />
+                    )}
+                    <input
+                      autoFocus
+                      className="min-w-0 flex-1 rounded border border-[var(--color-accent)] bg-[var(--color-bg-tertiary)] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)] outline-none"
+                      placeholder={creatingIn.type === 'file' ? 'filename' : 'folder name'}
+                      value={createName}
+                      onChange={(e) => setCreateName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && createName) {
+                          if (creatingIn.type === 'file') void handleNewFile(creatingIn.folder, createName);
+                          else void handleNewFolder(creatingIn.folder, createName);
+                          setCreatingIn(null);
+                        }
+                        if (e.key === 'Escape') setCreatingIn(null);
+                      }}
+                      onBlur={() => setCreatingIn(null)}
+                    />
+                  </div>
+                )}
               </div>
             );
           })}
 
-          {!loadingPath && rootEntries.length === 0 && (
+          {creatingIn && creatingIn.folder === rootKey && (
+            <div className="flex items-center gap-1 px-3 pr-2">
+              <span className="w-4 shrink-0" />
+              {creatingIn.type === 'folder' ? (
+                <FolderPlus className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-muted)]" />
+              ) : (
+                <FilePlus className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-primary)]" />
+              )}
+              <input
+                autoFocus
+                className="min-w-0 flex-1 rounded border border-[var(--color-accent)] bg-[var(--color-bg-tertiary)] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)] outline-none"
+                placeholder={creatingIn.type === 'file' ? 'filename' : 'folder name'}
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && createName) {
+                    if (creatingIn.type === 'file') void handleNewFile(creatingIn.folder, createName);
+                    else void handleNewFolder(creatingIn.folder, createName);
+                    setCreatingIn(null);
+                  }
+                  if (e.key === 'Escape') setCreatingIn(null);
+                }}
+                onBlur={() => setCreatingIn(null)}
+              />
+            </div>
+          )}
+
+          {!loadingPath && rootEntries.length === 0 && !creatingIn && (
             <div className="px-3 py-4 text-sm text-[var(--color-text-muted)]">This directory is empty.</div>
           )}
         </div>
@@ -391,27 +573,95 @@ export function FileExplorer() {
       {contextMenu && (
         <div
           ref={contextMenuRef}
-          className="fixed z-50 w-40 rounded border border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
+          className="fixed z-50 min-w-[180px] rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
-          {contextMenu.node.entry.isDir && (
-            <ContextItem label="cd here" onClick={() => {
-              void handleCdToPath(contextMenu.node.path);
+          {contextMenu.node && !contextMenu.node.entry.isDir && (
+            <>
+              <ContextMenuItem icon={<FileText className="h-3.5 w-3.5" />} label="Open" onClick={() => {
+                void handleOpenFile(contextMenu.node!.path);
+                setContextMenu(null);
+              }} />
+              <ContextMenuItem icon={<Pencil className="h-3.5 w-3.5" />} label="Rename" onClick={() => {
+                setRenamingPath(contextMenu.node!.path);
+                setRenameValue(contextMenu.node!.entry.name);
+                setContextMenu(null);
+              }} />
+              <ContextMenuItem icon={<Copy className="h-3.5 w-3.5" />} label="Copy" onClick={() => {
+                setClipboardPath(contextMenu.node!.path);
+                setContextMenu(null);
+              }} />
+              <ContextMenuItem icon={<ClipboardPaste className="h-3.5 w-3.5" />} label="Paste" disabled={!clipboardPath} onClick={() => {
+                void handlePaste(contextMenu.folderPath);
+                setContextMenu(null);
+              }} />
+              <div className="my-1 border-t border-[var(--color-border)]" />
+            </>
+          )}
+          {contextMenu.node?.entry.isDir && (
+            <>
+              <ContextMenuItem icon={<Terminal className="h-3.5 w-3.5" />} label="Open in Terminal" onClick={() => {
+                void handleCdToPath(contextMenu.node!.path);
+                setContextMenu(null);
+              }} />
+              <ContextMenuItem icon={<ClipboardPaste className="h-3.5 w-3.5" />} label="Paste" disabled={!clipboardPath} onClick={() => {
+                void handlePaste(contextMenu.node!.path);
+                setContextMenu(null);
+              }} />
+            </>
+          )}
+          {!contextMenu.node && (
+            <>
+              <ContextMenuItem icon={<Terminal className="h-3.5 w-3.5" />} label="Open in Terminal" onClick={() => {
+                void handleCdToPath(contextMenu.folderPath);
+                setContextMenu(null);
+              }} />
+              <ContextMenuItem icon={<ClipboardPaste className="h-3.5 w-3.5" />} label="Paste" disabled={!clipboardPath} onClick={() => {
+                void handlePaste(contextMenu.folderPath);
+                setContextMenu(null);
+              }} />
+            </>
+          )}
+          {activePaneKind === 'local-terminal' && (
+            <ContextMenuItem icon={<ExternalLink className="h-3.5 w-3.5" />} label="Reveal in Finder" onClick={() => {
+              void handleRevealInFinder(contextMenu.node?.entry.isDir ? contextMenu.node.path : contextMenu.folderPath);
               setContextMenu(null);
             }} />
           )}
-          <ContextItem label="Copy path" onClick={() => {
-            void handleCopyPath(contextMenu.node.path);
+          <ContextMenuItem icon={<FilePlus className="h-3.5 w-3.5" />} label="New File" onClick={() => {
+            setCreatingIn({ folder: contextMenu.folderPath, type: 'file' });
+            setCreateName('');
             setContextMenu(null);
           }} />
-          <ContextItem
-            label="Open in SFTP"
-            disabled={!canBrowseRemote}
-            onClick={() => {
-              handleOpenSftp();
+          <ContextMenuItem icon={<FolderPlus className="h-3.5 w-3.5" />} label="New Folder" onClick={() => {
+            setCreatingIn({ folder: contextMenu.folderPath, type: 'folder' });
+            setCreateName('');
+            setContextMenu(null);
+          }} />
+          <div className="my-1 border-t border-[var(--color-border)]" />
+          <ContextMenuItem icon={<Copy className="h-3.5 w-3.5" />} label="Copy Path" onClick={() => {
+            void handleCopyPath(contextMenu.node?.path ?? contextMenu.folderPath);
+            setContextMenu(null);
+          }} />
+          {contextMenu.node && !contextMenu.node.entry.isDir && (
+            <ContextMenuItem icon={<Copy className="h-3.5 w-3.5" />} label="Copy Relative Path" onClick={() => {
+              void handleCopyRelativePath(contextMenu.node!.path);
               setContextMenu(null);
-            }}
-          />
+            }} />
+          )}
+          <ContextMenuItem icon={<RefreshCw className="h-3.5 w-3.5" />} label="Refresh" onClick={() => {
+            void loadDirectory(contextMenu.folderPath, true);
+            setContextMenu(null);
+          }} />
+          {contextMenu.node && !contextMenu.node.entry.isDir && (
+            <>
+              <div className="my-1 border-t border-[var(--color-border)]" />
+              <ContextMenuItem icon={<Trash2 className="h-3.5 w-3.5" />} label="Delete" danger onClick={() => {
+                void handleDelete(contextMenu.node!.path);
+                setContextMenu(null);
+              }} />
+            </>
+          )}
         </div>
       )}
     </div>
@@ -476,14 +726,19 @@ function ExplorerHeader({
   );
 }
 
-function ContextItem({ label, onClick, disabled = false }: { label: string; onClick: () => void; disabled?: boolean }) {
+function ContextMenuItem({ icon, label, onClick, disabled = false, danger = false }: { icon?: React.ReactNode; label: string; onClick: () => void; disabled?: boolean; danger?: boolean }) {
   return (
     <button
       type="button"
-      className="w-full px-3 py-1.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ${
+        danger
+          ? 'text-red-400 hover:bg-red-500/10'
+          : 'text-[var(--color-text-primary)] hover:bg-[var(--color-hover)]'
+      }`}
       onClick={onClick}
       disabled={disabled}
     >
+      {icon && <span className="text-[var(--color-text-muted)]">{icon}</span>}
       {label}
     </button>
   );

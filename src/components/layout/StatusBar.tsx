@@ -256,7 +256,7 @@ export function StatusBar() {
   };
 
   return (
-    <div className="h-7 shrink-0 select-none border-t border-[var(--color-border)] bg-[var(--color-bg-tertiary)] px-3 text-xs text-[var(--color-text-muted)]">
+    <div className="h-8 shrink-0 select-none border-t border-[var(--color-border)] bg-[var(--color-bg-tertiary)] px-3 text-xs text-[var(--color-text-muted)]">
       <div className="flex h-full items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex min-w-0 items-center gap-2 hover:text-[var(--color-text-primary)]" title={statusState.title}>

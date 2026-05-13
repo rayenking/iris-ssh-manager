@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
-import { X, ShieldCheck } from 'lucide-react';
+import { X, ShieldCheck, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import type { Connection, AuthMethod, CreateConnectionInput, UpdateConnectionInput } from '../../types/connection';
 import { useConnectionStore } from '../../stores/connectionStore';
 import { tauriApi } from '../../lib/tauri';
@@ -13,6 +13,8 @@ interface Props {
 export function ConnectionForm({ connection, onClose }: Props) {
   const { createConnection, updateConnection, groups } = useConnectionStore();
   const [hasKeychainCredential, setHasKeychainCredential] = useState(false);
+  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [testError, setTestError] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     hostname: '',
@@ -73,6 +75,28 @@ export function ConnectionForm({ connection, onClose }: Props) {
       onClose();
     } catch (err) {
       console.error('Failed to save connection', err);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    if (!formData.hostname || !formData.username) return;
+
+    setTestStatus('testing');
+    setTestError('');
+
+    try {
+      await tauriApi.sshTestConnection(
+        formData.hostname,
+        parseInt(formData.port, 10) || 22,
+        formData.username,
+        formData.authMethod,
+        formData.password || undefined,
+        formData.privateKeyPath || undefined,
+      );
+      setTestStatus('success');
+    } catch (err) {
+      setTestStatus('error');
+      setTestError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -219,20 +243,41 @@ export function ConnectionForm({ connection, onClose }: Props) {
             </div>
           </div>
           
-          <div className="p-4 border-t border-[var(--color-border)] flex justify-end gap-3 shrink-0">
-            <button 
-              type="button" 
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors"
-            >
-              Cancel
-            </button>
-            <button 
-              type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-[var(--color-accent)] hover:opacity-90 rounded transition-opacity"
-            >
-              {connection ? 'Save Changes' : 'Create Connection'}
-            </button>
+          <div className="p-4 border-t border-[var(--color-border)] flex items-center justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                type="button"
+                onClick={handleTestConnection}
+                disabled={testStatus === 'testing' || !formData.hostname || !formData.username}
+                className="px-3 py-2 text-sm font-medium text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                {testStatus === 'testing' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {testStatus === 'success' && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
+                {testStatus === 'error' && <XCircle className="w-3.5 h-3.5 text-red-500" />}
+                Test Connection
+              </button>
+              {testStatus === 'success' && (
+                <span className="text-xs text-green-500">Connected successfully</span>
+              )}
+              {testStatus === 'error' && (
+                <span className="text-xs text-red-500 truncate max-w-[200px]" title={testError}>{testError}</span>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] rounded transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-medium text-white bg-[var(--color-accent)] hover:opacity-90 rounded transition-opacity"
+              >
+                {connection ? 'Save Changes' : 'Create Connection'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

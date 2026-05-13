@@ -192,6 +192,50 @@ async fn get_session(
         .ok_or_else(|| format!("ssh session not found: {session_id}"))
 }
 
+#[tauri::command]
+pub async fn ssh_test_connection(
+    hostname: String,
+    port: u16,
+    username: String,
+    auth_method: String,
+    password: Option<String>,
+    private_key_path: Option<String>,
+) -> Result<(), String> {
+    let auth = match auth_method.as_str() {
+        "password" => AuthMethod::Password(password.unwrap_or_default()),
+        "publicKey" => {
+            let key_path = private_key_path
+                .map(std::path::PathBuf::from)
+                .ok_or_else(|| "private_key_path is required for publicKey auth".to_string())?;
+            AuthMethod::PublicKey {
+                key_path,
+                passphrase: None,
+            }
+        }
+        "agent" => AuthMethod::Agent,
+        other => return Err(format!("unsupported auth method: {other}")),
+    };
+
+    let mut session = timeout(
+        SSH_TRANSPORT_TIMEOUT,
+        SshSession::connect(&hostname, port),
+    )
+    .await
+    .map_err(|_| format!("Timed out connecting to {hostname}:{port}"))?
+    .map_err(|error| error.to_string())?;
+
+    timeout(
+        SSH_AUTH_TIMEOUT,
+        session.authenticate(&username, &auth),
+    )
+    .await
+    .map_err(|_| format!("Timed out authenticating as {username} on {hostname}:{port}"))?
+    .map_err(|error| error.to_string())?;
+
+    session.disconnect().await.map_err(|error| error.to_string())?;
+    Ok(())
+}
+
 fn parse_session_id(session_id: &str) -> Result<Uuid, String> {
     Uuid::parse_str(session_id).map_err(|error| error.to_string())
 }

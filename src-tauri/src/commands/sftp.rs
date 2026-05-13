@@ -181,11 +181,81 @@ pub async fn local_rename(old_path: String, new_path: String) -> Result<(), Stri
 }
 
 #[tauri::command]
+pub async fn local_copy_file(source: String, dest: String) -> Result<(), String> {
+    let src = resolve_local_path(&source)?;
+    let dst = resolve_local_path(&dest)?;
+
+    let final_dst = if dst.exists() {
+        let stem = dst.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
+        let ext = dst.extension().and_then(|e| e.to_str());
+        let parent = dst.parent().unwrap_or(&dst);
+        let mut counter = 1u32;
+        loop {
+            let new_name = match ext {
+                Some(e) => format!("{}-copy{}.{}", stem, counter, e),
+                None => format!("{}-copy{}", stem, counter),
+            };
+            let candidate = parent.join(&new_name);
+            if !candidate.exists() {
+                break candidate;
+            }
+            counter += 1;
+        }
+    } else {
+        dst
+    };
+
+    tokio::fs::copy(&src, &final_dst)
+        .await
+        .map_err(|e| format!("failed to copy {} to {}: {e}", src.display(), final_dst.display()))?;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn local_mkdir(path: String) -> Result<(), String> {
     let resolved = resolve_local_path(&path)?;
     tokio::fs::create_dir_all(&resolved)
         .await
         .map_err(|e| format!("failed to create directory {}: {e}", resolved.display()))
+}
+
+#[tauri::command]
+pub async fn reveal_in_file_manager(path: String) -> Result<(), String> {
+    let resolved = resolve_local_path(&path)?;
+    let target = if resolved.is_file() {
+        resolved.parent().unwrap_or(&resolved).to_path_buf()
+    } else {
+        resolved
+    };
+
+    #[cfg(target_os = "macos")]
+    {
+        tokio::process::Command::new("open")
+            .arg(&target)
+            .status()
+            .await
+            .map_err(|e| format!("failed to reveal: {e}"))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        tokio::process::Command::new("xdg-open")
+            .arg(&target)
+            .status()
+            .await
+            .map_err(|e| format!("failed to reveal: {e}"))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        tokio::process::Command::new("explorer")
+            .arg(&target)
+            .status()
+            .await
+            .map_err(|e| format!("failed to reveal: {e}"))?;
+    }
+
+    Ok(())
 }
 
 #[tauri::command]

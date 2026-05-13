@@ -22,7 +22,7 @@ pub fn run() {
                 .map_err(|error| error.to_string())?;
             let db_connection = db::init_db(&app_data_dir).map_err(|error| error.to_string())?;
 
-            if let Err(e) = keychain::init_keychain() {
+            if let Err(e) = keychain::init_keychain(&app_data_dir) {
                 log::warn!("Keychain unavailable, credential storage will not work: {e}");
             }
 
@@ -57,6 +57,7 @@ pub fn run() {
             commands::terminal::ssh_disconnect,
             commands::terminal::ssh_write,
             commands::terminal::ssh_resize,
+            commands::terminal::ssh_test_connection,
             commands::local_terminal::local_shell_open,
             commands::local_terminal::local_shell_attach,
             commands::local_terminal::local_shell_write,
@@ -81,7 +82,9 @@ pub fn run() {
             commands::sftp::local_write_file,
             commands::sftp::local_delete,
             commands::sftp::local_rename,
+            commands::sftp::local_copy_file,
             commands::sftp::local_mkdir,
+            commands::sftp::reveal_in_file_manager,
             commands::config::parse_ssh_config,
             commands::config::import_ssh_config,
             commands::git::get_git_repo_root,

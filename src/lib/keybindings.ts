@@ -13,9 +13,9 @@ const defaultRegistry: KeybindingRegistry = {
   'close-tab': { combo: 'Ctrl+w' },
   'open-settings': { combo: 'Ctrl+,' },
   'toggle-snippets': { combo: 'Ctrl+Shift+s' },
-  'toggle-explorer': { combo: 'Ctrl+e' },
+  'toggle-explorer': { combo: 'Ctrl+Shift+e' },
   'open-import-config': { combo: 'Ctrl+Shift+i' },
-  'open-sftp': { combo: 'Ctrl+Shift+o' },
+  'open-sftp': { combo: 'Ctrl+Shift+f' },
   'local-terminal': { combo: 'Ctrl+Shift+t' },
 };
 
