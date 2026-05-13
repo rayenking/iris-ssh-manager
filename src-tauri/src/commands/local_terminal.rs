@@ -262,6 +262,7 @@ pub async fn local_shell_open(
         .map_err(|error| error.to_string())?;
 
     let mut command = CommandBuilder::new(default_shell());
+    command.arg("-l");
     command.env("TERM", "xterm-256color");
     if let Ok(lang) = env::var("LANG") {
         command.env("LANG", lang);
