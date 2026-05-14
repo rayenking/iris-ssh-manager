@@ -18,9 +18,37 @@
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue" alt="Platform" />
 </p>
 
+## Screenshots
+
 <p align="center">
-  <img src=".github/assets/cover.png" alt="IrisX Preview" width="720" />
+  <img src="docs/screenshots/terminal.png" alt="SSH Terminal" width="720" />
 </p>
+<p align="center"><em>SSH Terminal — xterm.js with WebGL rendering</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/connections.png" alt="Connection Manager" width="720" />
+</p>
+<p align="center"><em>Connection Manager — groups, search, and drag reorder</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/split-pane.png" alt="Split Panes" width="720" />
+</p>
+<p align="center"><em>Split Panes — multiple sessions side by side</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/file-explorer.png" alt="SFTP File Explorer" width="720" />
+</p>
+<p align="center"><em>SFTP File Explorer — browse and manage remote files</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/connection-dialog.png" alt="Connection Dialog" width="720" />
+</p>
+<p align="center"><em>Connection Dialog — add or edit SSH connections</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/local-terminal.png" alt="Local Terminal" width="720" />
+</p>
+<p align="center"><em>Local Terminal — local shell sessions without SSH</em></p>
 
 ## Features
 
