@@ -21,7 +21,7 @@ fetch_tag() {
 
 install_linux_deb() {
   fetch_tag
-  local DEB_NAME="Iris.SSH.Manager_${VERSION}_amd64.deb"
+  local DEB_NAME="IrisX_${VERSION}_amd64.deb"
   local DEB_URL="https://github.com/$REPO/releases/download/$TAG/$DEB_NAME"
 
   info "Downloading $DEB_NAME..."
@@ -55,7 +55,7 @@ install_arch() {
   fi
 
   fetch_tag
-  local DEB_NAME="Iris.SSH.Manager_${VERSION}_amd64.deb"
+  local DEB_NAME="IrisX_${VERSION}_amd64.deb"
   local DEB_URL="https://github.com/$REPO/releases/download/$TAG/$DEB_NAME"
 
   info "Downloading $DEB_NAME..."
@@ -73,8 +73,8 @@ install_macos() {
   info "Installing on macOS..."
   fetch_tag
 
-  local DMG_INTEL="Iris.SSH.Manager_${VERSION}_x64.dmg"
-  local DMG_ARM="Iris.SSH.Manager_${VERSION}_aarch64.dmg"
+  local DMG_INTEL="IrisX_${VERSION}_x64.dmg"
+  local DMG_ARM="IrisX_${VERSION}_aarch64.dmg"
   local DMG_NAME
 
   if [[ "$ARCH" == "arm64" || "$ARCH" == "aarch64" ]]; then
@@ -151,7 +151,7 @@ install_macos() {
 
 install_windows() {
   fetch_tag
-  local EXE_NAME="Iris.SSH.Manager_${VERSION}_x64-setup.exe"
+  local EXE_NAME="IrisX_${VERSION}_x64-setup.exe"
   local EXE_URL="https://github.com/$REPO/releases/download/$TAG/$(echo "$EXE_NAME" | sed 's/ /%20/g')"
 
   info "Downloading $EXE_NAME..."
