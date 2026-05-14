@@ -821,11 +821,7 @@ function formatPathLabel(path: string) {
   const trimmed = path.replace(/[\\/]$/, '');
   const parts = trimmed.split(/[\\/]+/).filter(Boolean);
 
-  if (parts.length <= 3) {
-    return trimmed;
-  }
-
-  return `…/${parts.slice(-3).join('/')}`;
+  return parts[parts.length - 1] || trimmed;
 }
 
 function formatBytes(bytes: number) {
