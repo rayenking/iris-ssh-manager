@@ -46,9 +46,9 @@
 <p align="center"><em>Connection Dialog — add or edit SSH connections</em></p>
 
 <p align="center">
-  <img src="docs/screenshots/local-terminal.png" alt="Local Terminal" width="720" />
+  <img src="docs/screenshots/port-forwarding.png" alt="Port Forwarding" width="720" />
 </p>
-<p align="center"><em>Local Terminal — local shell sessions without SSH</em></p>
+<p align="center"><em>Port Forwarding — local, remote, and dynamic tunnel management</em></p>
 
 ## Features
 
